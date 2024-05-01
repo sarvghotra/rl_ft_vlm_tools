@@ -48,9 +48,8 @@ eval_idefics2SFT_clevr_math.ipynb
 ## Additional changes made to make the base repo work for our method submitted as a requirement for the project:
 1. Dataset code: dataset/clver_math.py
 2. Model code: models/create_model.py
-3. QLoRA code:
-4. TRL for IDEFICS2 (it's not currently supported in TRL):
-5. Code changes for working with CLEVR-Math dataset including evaluation and reward computing:
-6. Notebooks for evaluting baselines:
-    - eval_idefics2_clevr_math.ipynb
-    - eval_idefics2SFT_clevr_math.ipynb
+3. QLoRA code ([code link](https://github.com/sarvghotra/rl_ft_vlm_tools/blob/7ec58a5317d6aa94091ea1408a87cf96b4348fb1/models/create_model.py#L126C5-L147C10))
+4. TRL for IDEFICS2 (it's not currently supported in TRL lib) ([code link](https://github.com/sarvghotra/rl_ft_vlm_tools/blob/7ec58a5317d6aa94091ea1408a87cf96b4348fb1/models/create_model.py#L10C1-L21C1))
+5. Notebooks for evaluting baselines:
+    - [eval_idefics2_clevr_math.ipynb](https://github.com/sarvghotra/rl_ft_vlm_tools/blob/main/eval_idefics2_clevr_math.ipynb)
+    - [eval_idefics2SFT_clevr_math.ipynb](https://github.com/sarvghotra/rl_ft_vlm_tools/blob/main/eval_idefics2SFT_clevr_math.ipynb)
