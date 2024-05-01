@@ -1,0 +1,2693 @@
+commit 205d56413b482eca2fda793c20fe9cb64164b342
+Author: sarvghotra <sssarvjeet27@gmail.com>
+Date:   Wed May 1 00:09:11 2024 -0400
+
+    VLM finetune on CLEVR-Math data using PPO
+
+diff --git a/README.md b/README.md
+index b539492..dc2f3a5 100644
+--- a/README.md
++++ b/README.md
+@@ -1,105 +1,56 @@
+-# ReFT: Reasoning with REinforced Fine-Tuning
+-This repo contains source code and data to reproduce the results in the research paper [ReFT: Reasoning with REinforced Fine-Tuning](https://arxiv.org/abs/2401.08967)
++# Learning planning and tool using in VLMs using RL
+ 
+-## Instruction
+-### SFT
+-Main script: `train_sft_model.py`
+-
+-Run SFT:
++## Instructions for setting up the environment
++### Install dependencies
+ ```
+-bash exps/paper_exps/SFT/gsm8k.sh # or svamp, mathqa
++conda env create -f environment.yml
+ ```
+-### ReFT
+-Main script: `train_rl_reft.py`
+-
+-Run ReFT:
++### Download pre-trained models
+ ```
+-bash exps/paper_exps/ReFT/gsm8k.sh # or svamp, mathqa
++mkdir pre_trained_models
++cd pre_trained_models
++git lfs install
++git clone https://huggingface.co/HuggingFaceM4/idefics2-8b
++git clone https://huggingface.co/HuggingFaceM4/idefics2-8b-base
+ ```
+ 
+-### Online-SL
+-Main script: `train_rl_sl.py`
+ 
+-Run Online-SL:
+-```
+-bash exps/paper_exps/OnSL/gsm8k.sh # or svamp, mathqa
+-```
++## Instructions for running experiments
+ 
+-### Offline-SL
+-Main script: `train_sl_model.py`
++### Instructions for our method
+ 
+-First, use one of the checkpoint and run sampling:
++#### VLM-tools Finetune with RL
+ ```
+-bash exps/paper_exps/Sampling/gsm8k.sh # or svamp, mathqa
++bash exps/paper_exps/ReFT/clevr_math.sh
+ ```
+ 
+-Then configure the train data path and run Offline-SL:
+-```
+-bash exps/paper_exps/OffSL/gsm8k.sh # or svamp, mathqa
+-```
+ 
+-### Top-1 and voting Acc
+-Main script: `sampling.py`
+ 
+-Configure variables e.g num_return_sequences=100, do_sample=1.0 for voting@100, then run sampling:
++### Instructions for baselines
++
++#### IDEFICS-2 Base (inference):
+ ```
+-bash exps/paper_exps/Sampling/gsm8k.sh # or svamp, mathqa
++eval_idefics2_clevr_math.ipynb
+ ```
+ 
+-### Reranking
+-Main script: `train_reward_model.py`
+-
+-First, use one of the (earlier) checkpoint to run sampling on the train set and use the best checkpoint to run sampling on the test set.
++#### Supervised Fine Tuning
+ ```
+-bash exps/paper_exps/Sampling/gsm8k.sh 
+-bash exps/paper_exps/Sampling/gsm8k_test.sh # or gsm8k_reft_test
++bash exps/paper_exps/SFT/clevr_math.sh
+ ```
+-Configure the data path and train the rerank model:
++
++#### Supervised Fine Tuned model inference
++Note: we used the SFT on CLEVR-Math weights released by Huggingface on [link]()
+ ```
+-bash exps/paper_exps/Rerank/gsm8k.sh # or gsm8k_reft
++eval_idefics2SFT_clevr_math.ipynb
+ ```
+ 
+-## Checkpoints
+-We provide checkpoints for some Galactica and Codellama models at different stages: warmup-SFT, SFT, SFT-Rerank, ReFT and ReFT-Rerank
+-* [Codellama-7b-hf-SFT-warmup-GSM8k](https://huggingface.co/lqtrung1998/Codellama-7b-hf-SFT-warmup-GSM8k)
+-* [Codellama-7b-hf-SFT-GSM8k](https://huggingface.co/lqtrung1998/Codellama-7b-hf-SFT-GSM8k)
+-* [Codellama-7b-hf-SFT-Rerank-GSM8k](https://huggingface.co/lqtrung1998/Codellama-7b-hf-SFT-Rerank-GSM8k)
+-* [Codellama-7b-hf-ReFT-GSM8k](https://huggingface.co/lqtrung1998/Codellama-7b-hf-ReFT-GSM8k)
+-* [Codellama-7b-hf-ReFT-Rerank-GSM8k](https://huggingface.co/lqtrung1998/Codellama-7b-hf-ReFT-Rerank-GSM8k)
+-* [galactica-6.7b-SFT-warmup-GSM8k](https://huggingface.co/lqtrung1998/galactica-6.7b-SFT-warmup-GSM8k)
+-* [galactica-6.7b-SFT-GSM8k](https://huggingface.co/lqtrung1998/galactica-6.7b-SFT-GSM8k)
+-* [galactica-6.7b-SFT-Rerank-GSM8k](https://huggingface.co/lqtrung1998/galactica-6.7b-SFT-Rerank-GSM8k)
+-* [galactica-6.7b-ReFT-GSM8k](https://huggingface.co/lqtrung1998/galactica-6.7b-ReFT-GSM8k)
+-* [galactica-6.7b-ReFT-Rerank-GSM8k](https://huggingface.co/lqtrung1998/galactica-6.7b-ReFT-Rerank-GSM8k)
+-
+-Note: Our models are tuned based on Codellama and Galactica, thus, licenses applicable to Codellama and Galactica, such as [Llama license](https://github.com/lqtrung1998/mwp_ReFT/blob/main/Llama_License.txt) and non-commercial CC BY-NC 4.0 license, also hold on these models
+-
+-## Evaluation Results
+-See evaluations results of the models at table 4 of the research paper.
+-
+-Updated results:
+-|                                                                    |  Top-1 | Voting@100 | Rerank@100 |
+-|--------------------------------------------------------------------|:------:|:----------:|:----------:|
+-| Codellama-7b-hf-SFT-warmup-GSM8k                                   |  63.00 |      -     |      -     |
+-| Codellama-7b-hf-SFT-GSM8k<br>(+Codellama-7b-hf-SFT-Rerank-GSM8k)   | 63.68  |    68.0    |    77.0    |
+-| Codellama-7b-hf-ReFT-GSM8k<br>(+Codellama-7b-hf-ReFT-Rerank-GSM8k) | 75.28  |    78.0    |    81.2    |
+-| galactica-6.7b-SFT-warmup-GSM8k                                    |  48.37 |      -     |      -     |
+-| galactica-6.7b-SFT-GSM8k<br>(+galactica-6.7b-SFT-Rerank-GSM8k)     | 58.83  |    62.9    |    73.4    |
+-| galactica-6.7b-ReFT-GSM8k<br>(+galactica-6.7b-ReFT-Rerank-GSM8k)   |  68.91 |    71.9    |    76.4    |
+ 
+-
+-## License:
+-[Apache2.0 License](https://github.com/lqtrung1998/mwp_ReFT/blob/main/License.txt)
+-
+-## Citation
+-Please cite the paper if you use our data, model or code.
+-```
+-@misc{luong2024reft,
+-      title={ReFT: Reasoning with Reinforced Fine-Tuning}, 
+-      author={Trung Quoc Luong and Xinbo Zhang and Zhanming Jie and Peng Sun and Xiaoran Jin and Hang Li},
+-      year={2024},
+-      eprint={2401.08967},
+-      archivePrefix={arXiv},
+-      primaryClass={cs.CL}
+-}
+-```
++## Additional changes made to make the base repo work for our method submitted as a requirement for the project:
++1. Dataset code: dataset/clver_math.py
++2. Model code: models/create_model.py
++3. QLoRA code:
++4. TRL for IDEFICS2 (it's not currently supported in TRL):
++5. Code changes for working with CLEVR-Math dataset including evaluation and reward computing:
++6. Notebooks for evaluting baselines:
++    - eval_idefics2_clevr_math.ipynb
++    - eval_idefics2SFT_clevr_math.ipynb
+diff --git a/dataset/clver_math.py b/dataset/clver_math.py
+new file mode 100644
+index 0000000..93ee6d0
+--- /dev/null
++++ b/dataset/clver_math.py
+@@ -0,0 +1,107 @@
++import torch
++from torch.utils.data import Dataset
++from datasets import load_dataset
++
++TEMPLATE_TO_ID = {
++    'subtraction': 0,
++    'addition': 1,
++    'adversarial': 2,
++    'subtraction-multihop': 3
++}
++
++ID_TO_TEMPLATE = {
++    0: 'subtraction',
++    1: 'addition',
++    2: 'adversarial',
++    3: 'subtraction-multihop'
++}
++
++
++class MyDataCollator:
++    def __init__(self, processor):
++        self.processor = processor
++        self.image_token_id = processor.tokenizer.additional_special_tokens_ids[
++            processor.tokenizer.additional_special_tokens.index("<image>")
++        ]
++
++    def __call__(self, examples):
++        texts = []
++        images = []
++        answers = []
++        temps = []
++        for example in examples:
++            image = example["image"]
++            question = example["query"]
++            answer = example["answer"]
++            messages = [
++                {
++                    "role": "user",
++                    "content": [
++                        {"type": "text", "text": "Answer briefly."},
++                        {"type": "image"},
++                        {"type": "text", "text": question}
++                    ]
++                }
++            ]
++            if example["split"] == "train":
++                messages.append(
++                    {
++                        "role": "assistant",
++                        "content": [
++                            {"type": "text", "text": answer}
++                        ]
++                    }
++                )
++            text = self.processor.apply_chat_template(messages, add_generation_prompt=False if example["split"] == "train" else True)
++            texts.append(text.strip())
++            images.append([image])
++            answers.append(answer)
++
++            if examples[0]['split'] != 'train':
++                temps.append(TEMPLATE_TO_ID[example["template"]])
++
++        batch = self.processor(text=texts, images=images, return_tensors="pt", padding=True)
++        ans_tokens = torch.IntTensor(answers)
++
++        labels = batch["input_ids"].clone()
++        labels[labels == self.processor.tokenizer.pad_token_id] = self.image_token_id
++        batch["labels"] = labels
++        batch["answers"] = ans_tokens
++
++        if examples[0]['split'] != 'train':
++            batch["labels"] = ans_tokens
++            batch["templates"] = torch.IntTensor(temps)
++
++        return batch
++
++
++class ClverMathDataset(Dataset):
++    def __init__(self, data_dir, split):
++        self.data_dir = data_dir
++        self.dataset = load_dataset('dali-does/clevr-math',
++                               cache_dir=data_dir,
++                               split=split)
++        self.split = split.lower()
++        self.len = len(self.dataset)
++        if self.split != 'train':
++            # self.dataset = self.dataset[:100]
++            # FIXME: change it to something larger
++            self.len = 1600
++
++    def __getitem__(self, idx):
++        ques = self.dataset[idx]['question']
++        label = self.dataset[idx]['label']
++        img = self.dataset[idx]['image'].convert('RGB')
++        template = self.dataset[idx]['template']
++        dp = {
++            'query': ques,
++            'image': img,
++            'answer': label,
++            'split': self.split
++        }
++        if self.split != 'train':
++            dp['template'] = template
++        return dp
++
++    def __len__(self):
++        return self.len
+diff --git a/environment.yml b/environment.yml
+new file mode 100644
+index 0000000..489dbac
+--- /dev/null
++++ b/environment.yml
+@@ -0,0 +1,203 @@
++name: idefics2
++channels:
++  - pytorch
++  - nvidia
++  - conda-forge
++  - defaults
++dependencies:
++  - _libgcc_mutex=0.1=conda_forge
++  - _openmp_mutex=4.5=2_kmp_llvm
++  - asttokens=2.4.1=pyhd8ed1ab_0
++  - backcall=0.2.0=pyh9f0ad1d_0
++  - blas=1.0=mkl
++  - brotli-python=1.0.9=py310h6a678d5_7
++  - bzip2=1.0.8=h5eee18b_5
++  - ca-certificates=2024.3.11=h06a4308_0
++  - charset-normalizer=2.0.4=pyhd3eb1b0_0
++  - cuda-cudart=12.1.105=0
++  - cuda-cupti=12.1.105=0
++  - cuda-libraries=12.1.0=0
++  - cuda-nvrtc=12.1.105=0
++  - cuda-nvtx=12.1.105=0
++  - cuda-opencl=12.4.127=0
++  - cuda-runtime=12.1.0=0
++  - decorator=5.1.1=pyhd8ed1ab_0
++  - entrypoints=0.4=pyhd8ed1ab_0
++  - executing=2.0.1=pyhd8ed1ab_0
++  - ffmpeg=4.3=hf484d3e_0
++  - freetype=2.12.1=h4a9f257_0
++  - git-lfs=3.5.1=ha770c72_0
++  - gmp=6.2.1=h295c915_3
++  - gnutls=3.6.15=he1e5248_0
++  - hjson-py=3.1.0=pyhd8ed1ab_0
++  - intel-openmp=2023.1.0=hdb19cb5_46306
++  - jedi=0.19.1=pyhd8ed1ab_0
++  - jpeg=9e=h5eee18b_1
++  - jupyter_client=7.3.4=pyhd8ed1ab_0
++  - jupyter_core=5.7.2=py310hff52083_0
++  - lame=3.100=h7b6447c_0
++  - lcms2=2.12=h3be6417_0
++  - ld_impl_linux-64=2.38=h1181459_1
++  - lerc=3.0=h295c915_0
++  - libaio=0.3.113=h5eee18b_0
++  - libcublas=12.1.0.26=0
++  - libcufft=11.0.2.4=0
++  - libcufile=1.9.1.3=0
++  - libcurand=10.3.5.147=0
++  - libcusolver=11.4.4.55=0
++  - libcusparse=12.0.2.55=0
++  - libdeflate=1.17=h5eee18b_1
++  - libffi=3.4.4=h6a678d5_0
++  - libgcc-ng=13.2.0=h807b86a_5
++  - libiconv=1.16=h7f8727e_2
++  - libidn2=2.3.4=h5eee18b_0
++  - libjpeg-turbo=2.0.0=h9bf148f_0
++  - libnpp=12.0.2.50=0
++  - libnvjitlink=12.1.105=0
++  - libnvjpeg=12.1.1.14=0
++  - libpng=1.6.39=h5eee18b_0
++  - libsodium=1.0.18=h36c2ea0_1
++  - libstdcxx-ng=13.2.0=h7e041cc_5
++  - libtasn1=4.19.0=h5eee18b_0
++  - libtiff=4.5.1=h6a678d5_0
++  - libunistring=0.9.10=h27cfd23_0
++  - libuuid=1.41.5=h5eee18b_0
++  - libwebp-base=1.3.2=h5eee18b_0
++  - llvm-openmp=14.0.6=h9e868ea_0
++  - lz4-c=1.9.4=h6a678d5_0
++  - matplotlib-inline=0.1.7=pyhd8ed1ab_0
++  - mkl=2023.1.0=h213fc3f_46344
++  - mkl_fft=1.3.8=py310h5eee18b_0
++  - mkl_random=1.2.4=py310hdb19cb5_0
++  - mpc=1.1.0=h10f8cd9_1
++  - mpfr=4.0.2=hb69a4c5_1
++  - ncurses=6.4=h6a678d5_0
++  - nest-asyncio=1.6.0=pyhd8ed1ab_0
++  - nettle=3.7.3=hbbd107a_1
++  - numpy-base=1.26.4=py310hb5e798b_0
++  - openh264=2.1.1=h4ff587b_0
++  - openjpeg=2.4.0=h3ad879b_0
++  - openssl=3.0.13=h7f8727e_0
++  - packaging=24.0=pyhd8ed1ab_0
++  - parso=0.8.4=pyhd8ed1ab_0
++  - pexpect=4.9.0=pyhd8ed1ab_0
++  - pickleshare=0.7.5=py_1003
++  - platformdirs=4.2.0=pyhd8ed1ab_0
++  - prompt-toolkit=3.0.42=pyha770c72_0
++  - ptyprocess=0.7.0=pyhd3deb0d_0
++  - pure_eval=0.2.2=pyhd8ed1ab_0
++  - pygments=2.17.2=pyhd8ed1ab_0
++  - pynvml=11.5.0=pyhd8ed1ab_0
++  - python=3.10.14=h955ad1f_0
++  - python-dateutil=2.9.0=pyhd8ed1ab_0
++  - python_abi=3.10=2_cp310
++  - pytorch=2.2.1=py3.10_cuda12.1_cudnn8.9.2_0
++  - pytorch-cuda=12.1=ha16c6d3_5
++  - pytorch-mutex=1.0=cuda
++  - readline=8.2=h5eee18b_0
++  - six=1.16.0=pyh6c4a22f_0
++  - sqlite=3.41.2=h5eee18b_0
++  - stack_data=0.6.2=pyhd8ed1ab_0
++  - tbb=2021.8.0=hdb19cb5_0
++  - tk=8.6.12=h1ccaba5_0
++  - torchtriton=2.2.0=py310
++  - traitlets=5.14.2=pyhd8ed1ab_0
++  - typing_extensions=4.9.0=py310h06a4308_1
++  - wcwidth=0.2.13=pyhd8ed1ab_0
++  - xz=5.4.6=h5eee18b_0
++  - yaml=0.2.5=h7b6447c_0
++  - zeromq=4.3.5=h6a678d5_0
++  - zlib=1.2.13=h5eee18b_0
++  - zstd=1.5.5=hc292b87_0
++  - pip:
++    - accelerate==0.29.3
++    - aiohttp==3.9.5
++    - aiosignal==1.3.1
++    - annotated-types==0.6.0
++    - appdirs==1.4.4
++    - async-timeout==4.0.3
++    - attrs==23.2.0
++    - bitsandbytes==0.43.1
++    - brotli==1.0.9
++    - certifi==2024.2.2
++    - click==8.1.7
++    - datasets==2.18.0
++    - debugpy==1.6.7
++    - deepspeed==0.14.0
++    - dill==0.3.8
++    - docker-pycreds==0.4.0
++    - docstring-parser==0.16
++    - einops==0.7.0
++    - filelock==3.13.1
++    - flash-attn==2.5.7
++    - frozenlist==1.4.1
++    - fsspec==2024.2.0
++    - gitdb==4.0.11
++    - gitpython==3.1.43
++    - gmpy2==2.1.2
++    - huggingface-hub==0.22.2
++    - idna==3.4
++    - ipykernel==6.14.0
++    - ipython==8.4.0
++    - jinja2==3.1.3
++    - jupyter-core==5.7.2
++    - markdown-it-py==3.0.0
++    - markupsafe==2.1.3
++    - mdurl==0.1.2
++    - mkl-fft==1.3.8
++    - mkl-random==1.2.4
++    - mkl-service==2.4.0
++    - mpmath==1.3.0
++    - multidict==6.0.5
++    - multiprocess==0.70.16
++    - networkx==3.1
++    - ninja==1.11.1.1
++    - numpy==1.26.4
++    - pandas==2.2.2
++    - pebble==5.0.6
++    - peft==0.10.0
++    - pillow==10.2.0
++    - pip==23.3.1
++    - prettytable==3.9.0
++    - protobuf==4.25.3
++    - psutil==5.9.0
++    - py-cpuinfo==9.0.0
++    - pyarrow==15.0.2
++    - pyarrow-hotfix==0.6
++    - pydantic==2.5.3
++    - pydantic-core==2.14.6
++    - pysocks==1.7.1
++    - pytz==2024.1
++    - pyyaml==6.0.1
++    - pyzmq==25.1.2
++    - regex==2024.4.16
++    - requests==2.31.0
++    - rich==13.7.1
++    - safetensors==0.4.3
++    - scipy==1.11.4
++    - sentry-sdk==1.45.0
++    - setproctitle==1.3.3
++    - setuptools==68.2.2
++    - shtab==1.7.1
++    - sigfig==1.3.3
++    - smmap==5.0.1
++    - sortedcontainers==2.4.0
++    - sympy==1.12
++    - tokenizers==0.19.0
++    - torch==2.2.1
++    - torchvision==0.17.1
++    - tornado==6.1
++    - tqdm==4.65.0
++    - transformers==4.40.0.dev0
++    - triton==2.2.0
++    - trl==0.8.7.dev0
++    - typing-extensions==4.9.0
++    - tyro==0.8.3
++    - tzdata==2024.1
++    - urllib3==2.1.0
++    - wandb==0.16.6
++    - wheel==0.41.2
++    - xxhash==3.4.1
++    - yarl==1.9.4
++prefix: /home/mila/s/sarvjeet-singh.ghotra/scratch/installs/conda/envs/idefics2
++
+diff --git a/exps/paper_exps/ReFT/_template_vlm.sh b/exps/paper_exps/ReFT/_template_vlm.sh
+new file mode 100644
+index 0000000..37b0ae4
+--- /dev/null
++++ b/exps/paper_exps/ReFT/_template_vlm.sh
+@@ -0,0 +1,106 @@
++#!/bin/bash
++export TOKENIZERS_PARALLELISM=True
++
++### Required variables
++exp_name=${exp_name:-''}
++train_file=${train_file:-''}
++test_file=${test_file:-''}
++engine=${engine:-''}
++model_name_or_path=${model_name_or_path:-''}
++ref_model_name_or_path=${ref_model_name_or_path:-''}
++tokenizer_name_or_path=${tokenizer_name_or_path:-''}
++n_epochs=${n_epochs:-''}
++kl_coef=${kl_coef:-''} # For NL should put 0.05, For Python put 0.01
++
++### Default variables
++model_dir="ppo_paper_final_new/_models_outputs_rl/${exp_name}/"
++config_file="./default_config_deepspeed.yaml"
++
++use_lora=False
++use_qlora=True
++
++batch_size="16"
++mini_batch_size="16"
++eval_batch_size="16"
++
++ppo_epochs="2"
++num_workers="8"
++learning_rate="5e-5"
++weight_decay="0"
++warmup_step="0"
++clip_grad_norm="1"
++vf_coef="5"
++# kl_coef="0.01"
++gamma="1.0"
++lam="0.95"
++adv_whitening='global'
++seed="42"
++max_input_length="300"
++max_gen_length="128"
++keep_num_ckpt='10'
++
++evaluating_epoch_freq="1"
++logging_epoch_freq="1"
++saving_epoch_freq="1"
++
++logging_step_freq="1"
++evaluating_step_freq="4000"   # "-100"
++saving_step_freq="4000"    # "-100"
++
++wandb_log="True"
++wandb_project="ReFT"
++wandb_run_name="${exp_name}"
++#########
++
++# --config_file "${config_file}" \
++
++num_processes='1'
++main_process_port='8888'
++
++echo "Running ${exp_name}"
++
++mkdir -p "${model_dir}"
++
++accelerate launch \
++            --num_processes=${num_processes} \
++            --main_process_port=${main_process_port} \
++    train_rl_reft_vlm.py \
++            --model_name_or_path "${model_name_or_path}" \
++            --tokenizer_name_or_path "${tokenizer_name_or_path}" \
++            --ref_model_name_or_path "${ref_model_name_or_path}" \
++            --train_file "${train_file}" \
++            --test_file "${test_file}" \
++            --model_dir "${model_dir}" \
++            --batch_size "${batch_size}" \
++            --mini_batch_size "${mini_batch_size}" \
++            --eval_batch_size "${eval_batch_size}" \
++            --ppo_epochs "${ppo_epochs}" \
++            --n_epochs "${n_epochs}" \
++            --num_workers "${num_workers}" \
++            --learning_rate "${learning_rate}" \
++            --weight_decay "${weight_decay}" \
++            --warmup_step "${warmup_step}" \
++            --clip_grad_norm "${clip_grad_norm}" \
++            --vf_coef "${vf_coef}" \
++            --kl_coef "${kl_coef}" \
++            --gamma "${gamma}" \
++            --lam "${lam}" \
++            --evaluating_epoch_freq "${evaluating_epoch_freq}" \
++            --logging_epoch_freq "${logging_epoch_freq}" \
++            --saving_epoch_freq "${saving_epoch_freq}" \
++            --evaluating_step_freq "${evaluating_step_freq}" \
++            --logging_step_freq "${logging_step_freq}" \
++            --saving_step_freq "${saving_step_freq}" \
++            --seed "${seed}" \
++            --max_input_length "${max_input_length}" \
++            --max_gen_length "${max_gen_length}" \
++            --wandb_log "${wandb_log}" \
++            --wandb_project "${wandb_project}" \
++            --wandb_run_name "${wandb_run_name}" \
++            --engine "${engine}" \
++            --adv_whitening "${adv_whitening}" \
++            --keep_num_ckpt "${keep_num_ckpt}" \
++            --use_lora "${use_lora}" \
++            --use_qlora "${use_qlora}" \
++            1> >(tee "${model_dir}"/"${exp_name}".log) \
++            2> >(tee "${model_dir}"/"${exp_name}".err >&2)
+diff --git a/exps/paper_exps/ReFT/clevr_math.sh b/exps/paper_exps/ReFT/clevr_math.sh
+new file mode 100644
+index 0000000..3bc2dc9
+--- /dev/null
++++ b/exps/paper_exps/ReFT/clevr_math.sh
+@@ -0,0 +1,15 @@
++### GSM8K
++## Python SDP
++# Codellama
++
++exp_name="clevr_rl_r1" \
++train_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++test_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++engine='python' \
++model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++ref_model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++tokenizer_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++n_epochs='2' \
++kl_coef='0.01' \
++    bash exps/paper_exps/ReFT/_template_vlm.sh
++
+diff --git a/exps/paper_exps/SFT/_template_vlm_tools.sh b/exps/paper_exps/SFT/_template_vlm_tools.sh
+new file mode 100644
+index 0000000..a59145a
+--- /dev/null
++++ b/exps/paper_exps/SFT/_template_vlm_tools.sh
+@@ -0,0 +1,89 @@
++#!/bin/bash
++export TOKENIZERS_PARALLELISM=True
++
++### Required variables
++exp_name=${exp_name:-''}
++train_file=${train_file:-''}
++test_file=${test_file:-''}
++engine=${engine:-''}
++model_name_or_path=${model_name_or_path:-''}
++tokenizer_name_or_path=${tokenizer_name_or_path:-''}
++n_epochs=${n_epochs:-''}
++
++### Default variables
++model_dir="ppo_paper_final_new/_models_outputs_sft/${exp_name}/"
++# config_file="./default_config_deepspeed_ga2.yaml"
++
++use_lora="False"
++use_qlora="True"
++
++batch_size="32"
++eval_batch_size="48"
++gradient_accumulation_steps="1"
++max_input_length="1024"
++num_workers="8"
++learning_rate="1e-4"
++weight_decay="0.01"
++warmup_step="50"
++clip_grad_norm="1"
++seed="42"
++keep_num_ckpt='10'
++
++logging_epoch_freq="1"
++evaluating_epoch_freq="1"
++saving_epoch_freq="1"
++
++logging_step_freq="10"
++evaluating_step_freq="2000"
++saving_step_freq="2000"
++
++wandb_log="True"
++wandb_project="RL_FT_VLM_tools"
++wandb_run_name="dbg_${exp_name}"
++#########
++
++num_processes='1'
++main_process_port='8888'
++
++# FIXME: remove debug flag
++# FIXME: num_processes=1
++
++# --config_file "${config_file}" \
++# --debug \
++
++mkdir -p "${model_dir}"
++accelerate launch \
++            --num_processes=${num_processes} \
++            --main_process_port=${main_process_port} \
++    train_sft_model_vlm_tools.py \
++            --model_name_or_path "${model_name_or_path}" \
++            --tokenizer_name_or_path "${tokenizer_name_or_path}" \
++            --train_file "${train_file}" \
++            --test_file "${test_file}" \
++            --model_dir "${model_dir}" \
++            --batch_size "${batch_size}" \
++            --eval_batch_size "${eval_batch_size}" \
++            --n_epochs "${n_epochs}" \
++            --num_workers "${num_workers}" \
++            --learning_rate "${learning_rate}" \
++            --weight_decay "${weight_decay}" \
++            --warmup_step "${warmup_step}" \
++            --clip_grad_norm "${clip_grad_norm}" \
++            --evaluating_epoch_freq "${evaluating_epoch_freq}" \
++            --logging_epoch_freq "${logging_epoch_freq}" \
++            --saving_epoch_freq "${saving_epoch_freq}" \
++            --evaluating_step_freq "${evaluating_step_freq}" \
++            --logging_step_freq "${logging_step_freq}" \
++            --saving_step_freq "${saving_step_freq}" \
++            --seed "${seed}" \
++            --max_input_length "${max_input_length}" \
++            --gradient_accumulation_steps "${gradient_accumulation_steps}" \
++            --keep_num_ckpt "${keep_num_ckpt}" \
++            --wandb_log "${wandb_log}" \
++            --wandb_project "${wandb_project}" \
++            --wandb_run_name "${wandb_run_name}" \
++            --engine "${engine}" \
++            --use_lora "${use_lora}" \
++            --use_qlora "${use_qlora}" \
++            1> >(tee "${model_dir}"/"${exp_name}".log) \
++            2> >(tee "${model_dir}"/"${exp_name}".err >&2)
+diff --git a/exps/paper_exps/SFT/clver_math.sh b/exps/paper_exps/SFT/clver_math.sh
+new file mode 100644
+index 0000000..71e5d89
+--- /dev/null
++++ b/exps/paper_exps/SFT/clver_math.sh
+@@ -0,0 +1,11 @@
++### Clver Math
++# Idefics2
++exp_name="dbg_clver_math_idefic2_sft" \
++train_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++test_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++engine='python' \
++model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++tokenizer_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++n_epochs='2' \
++    bash exps/paper_exps/SFT/_template_vlm_tools.sh
++
+diff --git a/models/create_model.py b/models/create_model.py
+new file mode 100644
+index 0000000..9fea5ff
+--- /dev/null
++++ b/models/create_model.py
+@@ -0,0 +1,159 @@
++import torch
++from transformers import AutoTokenizer, AutoModelForCausalLM, AutoProcessor
++from transformers import Idefics2ForConditionalGeneration
++from transformers import BitsAndBytesConfig
++from trl import get_kbit_device_map, get_quantization_config
++from peft import LoraConfig, get_peft_model
++from trl import AutoModelForCausalLMWithValueHead
++
++
++class Idefics2ForConditionalGenerationwithValueHead(AutoModelForCausalLMWithValueHead):
++    transformers_parent_class = Idefics2ForConditionalGeneration
++    lm_head_namings = ["lm_head", "embed_out"]
++    supported_args = (
++        "summary_dropout_prob",
++        "v_head_initializer_range",
++        "v_head_init_strategy",
++    )
++    def __init__(self, pretrained_model, **kwargs):
++        pretrained_model.config.hidden_size = pretrained_model.config.text_config.hidden_size
++        super().__init__(pretrained_model, **kwargs)
++
++
++def create_model(args):
++    tokenizer = AutoTokenizer.from_pretrained(args['tokenizer_name_or_path'], use_fast=True)
++    tokenizer.pad_token_id = 1
++    tokenizer.eos_token_id = 2
++
++    model = AutoModelForCausalLM.from_pretrained(args['model_name_or_path'], low_cpu_mem_usage=True, torch_dtype=torch.bfloat16)
++    model.resize_token_embeddings(len(tokenizer))
++    return model, tokenizer, None
++
++
++def create_idefics_model(args):
++    # FIXME: implement quantization
++    # quant_config = {
++    #     "use_peft": True,
++    #     "lora_r": 64,
++    #     "lora_alpha": 16,
++    #     "lora_target_modules": "all-linear"
++    # }
++    # quantization_config = get_quantization_config(quant_config)
++    # quantization_config = None
++    # model_kwargs = dict(
++    #     revision=args['model_config_model_revision'],
++    #     trust_remote_code=args['model_config_trust_remote_code'],
++    #     attn_implementation=args['model_config_attn_implementation'],
++    #     torch_dtype=args['torch_dtype'],
++    #     use_cache=False,
++    #     device_map=get_kbit_device_map() if quantization_config is not None else None,
++    #     quantization_config=quantization_config,
++    # )
++    # tokenizer = AutoTokenizer.from_pretrained(args['model_name_or_path'], use_fast=True)
++    # # tokenizer.chat_template = IDEFICS2_CHAT_TEMPLATE
++    # processor = AutoProcessor.from_pretrained(args['model_name_or_path'])
++    # processor.tokenizer = tokenizer
++    processor = AutoProcessor.from_pretrained(
++        args['model_name_or_path'],
++        do_image_splitting=False
++    )
++
++    # model = Idefics2ForConditionalGeneration.from_pretrained(args['model_name_or_path'], **model_kwargs)
++    if args['use_qlora'] or args['use_lora']:
++        lora_config = LoraConfig(
++            r=8,
++            lora_alpha=8,
++            lora_dropout=0.1,
++            target_modules='.*(text_model|modality_projection|perceiver_resampler).*(down_proj|gate_proj|up_proj|k_proj|q_proj|v_proj|o_proj).*$',
++            use_dora=False if args['use_qlora'] else True,
++            init_lora_weights="gaussian"
++        )
++        if args['use_qlora']:
++            bnb_config = BitsAndBytesConfig(
++                load_in_4bit=True,
++                bnb_4bit_quant_type="nf4",
++                bnb_4bit_compute_dtype=torch.float16
++            )
++        model = Idefics2ForConditionalGeneration.from_pretrained(
++            args['model_name_or_path'],
++            torch_dtype=torch.float16,
++            low_cpu_mem_usage=True,
++            quantization_config=bnb_config if args['use_qlora'] else None,
++        )
++        # model.add_adapter(lora_config)
++        # model.enable_adapters()
++        model = get_peft_model(model, lora_config)
++    else:
++        model = Idefics2ForConditionalGeneration.from_pretrained(
++            args['model_name_or_path'],
++            torch_dtype=torch.float16,
++            _attn_implementation="flash_attention_2", # Only available on A100 or H100
++        )
++
++    model.print_trainable_parameters()
++    return model, processor.tokenizer, processor
++
++
++def create_idefics_model_rl(args):
++    # FIXME: implement quantization
++    # quant_config = {
++    #     "use_peft": True,
++    #     "lora_r": 64,
++    #     "lora_alpha": 16,
++    #     "lora_target_modules": "all-linear"
++    # }
++    # quantization_config = get_quantization_config(quant_config)
++    # quantization_config = None
++    # model_kwargs = dict(
++    #     revision=args['model_config_model_revision'],
++    #     trust_remote_code=args['model_config_trust_remote_code'],
++    #     attn_implementation=args['model_config_attn_implementation'],
++    #     torch_dtype=args['torch_dtype'],
++    #     use_cache=False,
++    #     device_map=get_kbit_device_map() if quantization_config is not None else None,
++    #     quantization_config=quantization_config,
++    # )
++    # tokenizer = AutoTokenizer.from_pretrained(args['model_name_or_path'], use_fast=True)
++    # # tokenizer.chat_template = IDEFICS2_CHAT_TEMPLATE
++    # processor = AutoProcessor.from_pretrained(args['model_name_or_path'])
++    # processor.tokenizer = tokenizer
++    processor = AutoProcessor.from_pretrained(
++        args['model_name_or_path'],
++        do_image_splitting=False
++    )
++
++    # model = Idefics2ForConditionalGeneration.from_pretrained(args['model_name_or_path'], **model_kwargs)
++    if args['use_qlora'] or args['use_lora']:
++        lora_config = LoraConfig(
++            r=8,
++            lora_alpha=8,
++            lora_dropout=0.1,
++            target_modules='.*(text_model|modality_projection|perceiver_resampler).*(down_proj|gate_proj|up_proj|k_proj|q_proj|v_proj|o_proj).*$',
++            use_dora=False if args['use_qlora'] else True,
++            init_lora_weights="gaussian"
++        )
++        if args['use_qlora']:
++            bnb_config = BitsAndBytesConfig(
++                load_in_4bit=True,
++                bnb_4bit_quant_type="nf4",
++                bnb_4bit_compute_dtype=torch.float16
++            )
++        model = Idefics2ForConditionalGenerationwithValueHead.from_pretrained(
++            args['model_name_or_path'],
++            torch_dtype=torch.float16,
++            low_cpu_mem_usage=True,
++            quantization_config=bnb_config if args['use_qlora'] else None,
++            peft_config=lora_config
++        )
++        # model.add_adapter(lora_config)
++        # model.enable_adapters()
++        # model = get_peft_model(model, lora_config)
++    else:
++        model = Idefics2ForConditionalGenerationwithValueHead.from_pretrained(
++            args['model_name_or_path'],
++            torch_dtype=torch.float16,
++            _attn_implementation="flash_attention_2", # Only available on A100 or H100
++        )
++
++    # model.print_trainable_parameters()
++    return model, processor.tokenizer, processor
+diff --git a/scripts/init_slurm_env.sh b/scripts/init_slurm_env.sh
+new file mode 100644
+index 0000000..d32cfe7
+--- /dev/null
++++ b/scripts/init_slurm_env.sh
+@@ -0,0 +1,3 @@
++module load anaconda
++conda activate idefics2
++module load cuda/12.1.1
+diff --git a/scripts/launch_short_sft.sh b/scripts/launch_short_sft.sh
+new file mode 100644
+index 0000000..5b32ee9
+--- /dev/null
++++ b/scripts/launch_short_sft.sh
+@@ -0,0 +1,48 @@
++#!/bin/bash
++
++#SBATCH --job-name=rl_r1
++#SBATCH --output=logs/output_rl_r1.txt
++#SBATCH --error=logs/error_rl_r1.txt
++#SBATCH --time=3:00:00
++#SBATCH --gpus-per-task=a100l:1
++#SBATCH --mem=96G
++#SBATCH --cpus-per-task=24
++#SBATCH --ntasks-per-node=1
++#SBATCH --partition=short-unkillable
++#SBATCH --nodes=1
++
++module load anaconda
++conda activate idefics2
++module load cuda/12.1.1
++cd ..
++
++
++exp_name="clevr_rl_r1" \
++train_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++test_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++engine='python' \
++model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++ref_model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++tokenizer_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b' \
++n_epochs='2' \
++kl_coef='0.01' \
++    bash exps/paper_exps/ReFT/_template_vlm.sh
++
++
++
++
++
++
++
++
++
++### Clver Math
++# Idefics2
++# exp_name="clver_math_idefic2_sft" \
++# train_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++# test_file='/network/projects/aishwarya_lab/datasets/clevr-math/' \
++# engine='python' \
++# model_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b-base' \
++# tokenizer_name_or_path='/home/mila/s/sarvjeet-singh.ghotra/scratch/git/rl_ft_vlm_tools/pre_trained_models/idefics2-8b-base' \
++# n_epochs='2' \
++#     bash exps/paper_exps/SFT/_template_vlm_tools.sh
+diff --git a/train_rl_reft_vlm.py b/train_rl_reft_vlm.py
+new file mode 100644
+index 0000000..00cbd4b
+--- /dev/null
++++ b/train_rl_reft_vlm.py
+@@ -0,0 +1,1099 @@
++# Copyright 2023 Bytedance Ltd.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++
++#     http://www.apache.org/licenses/LICENSE-2.0
++
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++from accelerate import Accelerator, InitProcessGroupKwargs
++from accelerate.utils import pad_across_processes, broadcast
++from collections import defaultdict
++from dataclasses import dataclass, field, asdict
++from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, concatenate_datasets
++from datetime import timedelta
++from functools import partial
++import json
++import os
++import random
++from src.python_engine import run_python_code, process_code
++from src.utils import set_seed, floatify, compute_ETA, discount_cumsum, do_gather, allgather, allgather_masked_whiten
++from tqdm import tqdm
++import torch
++from torch.utils.data import DataLoader
++import deepspeed
++from transformers import AutoTokenizer, AutoModelForCausalLM, get_linear_schedule_with_warmup, get_constant_schedule_with_warmup
++from trl.core import masked_mean, masked_var, masked_whiten, logprobs_from_logits
++import numpy as np
++import wandb
++import shutil
++from prettytable import PrettyTable
++from models.create_model import create_idefics_model_rl
++from dataset.clver_math import ClverMathDataset, MyDataCollator, ID_TO_TEMPLATE
++from transformers import BitsAndBytesConfig
++from transformers import Idefics2ForConditionalGeneration
++tqdm = partial(tqdm, ncols=0, leave=False)
++
++TIMEOUT = 10
++instruction=None
++cot_trigger=None
++answer_trigger=None
++def setup_cot(src_name):
++    assert src_name in ['gsm8k', 'mathqa', 'svamp', 'mathqa-numeric']
++    global instruction
++    global cot_trigger
++    global answer_trigger
++    # Complete output is in this form: f'{instruction}{question.strip()}{cot_trigger}{answer_cot.strip()}'
++    instruction = 'Question:\n'
++    cot_trigger = '\nAnswer reasoning:\n'
++    answer_trigger = '\nTherefore, the answer is: '
++    return
++
++post_process_final_answer_fn_mapper = {
++    'gsm8k': lambda x: float(x.replace(',','').strip()),
++    'svamp': lambda x: float(x.replace(',','').strip()),
++    'mathqa': lambda x: x.lower().replace('"','').replace("'",'').strip(),
++    'mathqa-numeric': lambda x: float(x),
++}
++### the answer_cot is a list of answer_cot
++post_process_answer_cot_fn_mapper = {
++    ('python', 'gsm8k'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'svamp'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'mathqa'): lambda answer_cot: [str(res).lower().replace('"','').replace("'",'').strip() for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'mathqa-numeric'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('nl', 'gsm8k'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++    ('nl', 'svamp'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++    ('nl', 'mathqa'): lambda answer_cot: [res.split(answer_trigger)[-1].lower().replace('"','').replace("'",'').strip() for res in answer_cot],
++    ('nl', 'mathqa-numeric'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++}
++compare_answer_fn_mapper = {
++    'gsm8k': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++    'svamp': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++    'mathqa': lambda extracted_ans, target_answer: extracted_ans == target_answer,
++    'mathqa-numeric': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++}
++
++def prepare_deepspeed_ref_model(model):
++    # Adopted from: https://github.com/huggingface/trl/blob/02f5c1d8cee73045c837d01d7f1577a57779b035/trl/trainer/ppo_trainer.py#L1399
++    import deepspeed
++
++    # Adapted from accelerate: https://github.com/huggingface/accelerate/blob/739b135f8367becb67ffaada12fe76e3aa60fefd/src/accelerate/accelerator.py#L1473
++    deepspeed_plugin = accelerator.state.deepspeed_plugin
++    config_kwargs = deepspeed_plugin.deepspeed_config
++    if model is not None:
++        if hasattr(model, "config"):
++            hidden_size = (
++                max(model.config.hidden_sizes)
++                if getattr(model.config, "hidden_sizes", None)
++                else getattr(model.config, "hidden_size", None)
++            )
++            if hidden_size is not None and config_kwargs["zero_optimization"]["stage"] == 3:
++                # Note that `stage3_prefetch_bucket_size` can produce DeepSpeed messages like: `Invalidate trace cache @ step 0: expected module 1, but got module 0`
++                # This is expected and is not an error, see: https://github.com/microsoft/DeepSpeed/discussions/4081
++                config_kwargs.update(
++                    {
++                        "zero_optimization.reduce_bucket_size": hidden_size * hidden_size,
++                        "zero_optimization.stage3_param_persistence_threshold": 10 * hidden_size,
++                        "zero_optimization.stage3_prefetch_bucket_size": 0.9 * hidden_size * hidden_size,
++                    }
++                )
++
++    # If ZeRO-3 is used, we shard both the active and reference model.
++    # Otherwise, we assume the reference model fits in memory and is initialized on each device with ZeRO disabled (stage 0)
++    if config_kwargs["zero_optimization"]["stage"] != 3:
++        config_kwargs["zero_optimization"]["stage"] = 0
++    model, *_ = deepspeed.initialize(model=model, config=config_kwargs)
++    model.eval()
++    return model
++
++def prepare_datasets_and_data_loaders(args, tokenizer):
++    with accelerator.main_process_first():
++        # make raw dataset
++        raw_dataset = DatasetDict({
++            'train': Dataset.from_list(json.load(open(args['train_file'], 'r'))),
++            'test': Dataset.from_list(json.load(open(args['test_file'], 'r'))),
++        })
++        accelerator.print('Raw data:', raw_dataset)
++
++        # make cot related info
++        src_name = raw_dataset['train']['item_id'][0].split('_')[0]  # e.g., gsm8k_0, gsm8k_1, gsm8k_2, ...
++        setup_cot(src_name)
++        accelerator.print('Using instruction:', instruction)
++        accelerator.print('Using cot_trigger:', cot_trigger)
++        accelerator.print('Using answer_trigger:', answer_trigger)
++        def tokenize_fn(batch, args, tokenizer):
++            assert tokenizer.eos_token_id is not None, (tokenizer.eos_token_id, tokenizer.eos_token)
++            new_batch = defaultdict(list)
++            all_keys = list(batch.keys())
++            for item_values in zip(*(batch[k] for k in all_keys)):
++                item = {k: item_values[i] for i, k in enumerate(all_keys)}
++                item_id, question, answer_value, answer_cot = \
++                        item['item_id'], \
++                        item['question'], \
++                        item['answer_value'], \
++                        item.get('answer_cot', None), \
++
++                question = question.strip()
++                if answer_value is not None:
++                    answer_value = answer_value.strip()
++
++                if answer_cot:
++                    answer_cot = answer_cot.strip()
++                    if args['engine'] == 'nl':
++                        answer_cot += f'{answer_trigger}{answer_value}'
++
++                input = f'{instruction}{question}{cot_trigger}'
++                output = f'{answer_cot}'
++                prefix_text = f'{instruction}{question}{cot_trigger}'
++
++                # Modify for particular datasets and engine
++                if src_name in ['gsm8k', 'mathqa', 'svamp', 'mathqa-numeric'] and args['engine'] == 'python':
++                    prefix_text += f'def solution():\n    """{question}"""\n'
++
++                input_encode = tokenizer(input, add_special_tokens=False)
++                output_encode = tokenizer(output, add_special_tokens=False)
++                prefix_encode = tokenizer(prefix_text, add_special_tokens=False)
++
++                input_ids = input_encode['input_ids'] + output_encode['input_ids'] + [tokenizer.eos_token_id]
++                labels = [-100] * len(input_encode['input_ids']) + output_encode['input_ids'] + [tokenizer.eos_token_id]
++                attention_mask = [1] * len(input_ids)
++                prefix = prefix_encode['input_ids']
++                prefix_attention_mask = prefix_encode['attention_mask']
++
++                # Truncation
++                input_ids = input_ids[:args['max_input_length']]
++                labels = labels[:args['max_input_length']]
++                attention_mask = attention_mask[:args['max_input_length']]
++                prefix = prefix[:args['max_input_length']]
++                prefix_attention_mask = prefix_attention_mask[:args['max_input_length']]
++
++                ##
++                new_batch['input_ids'].append(input_ids)
++                new_batch['labels'].append(labels)
++                new_batch['attention_mask'].append(attention_mask)
++                new_batch['prefix'].append(prefix)
++                new_batch['prefix_attention_mask'].append(prefix_attention_mask)
++                ##
++                new_batch['item_id'].append(item_id)
++                new_batch['question'].append(question)
++                new_batch['prefix_text'].append(prefix_text)
++                new_batch['answer_cot'].append(answer_cot)
++                new_batch['answer_value'].append(answer_value)
++
++            return new_batch
++
++        tokenized_dataset = DatasetDict({
++            mode: dataset.map(
++                tokenize_fn, fn_kwargs={'args': args, 'tokenizer': tokenizer}, batched=True,
++                remove_columns=dataset.column_names,
++                num_proc=None, load_from_cache_file=True, keep_in_memory=False,
++            ) for mode, dataset in raw_dataset.items()})
++        accelerator.print('Processed data:', tokenized_dataset)
++
++        if accelerator.is_main_process and args['wandb_log']:
++            wandb.config.update({
++                "src_name": src_name,
++                "instruction": instruction,
++                "cot_trigger": cot_trigger,
++                "answer_trigger": answer_trigger,
++                "raw_dataset": str(raw_dataset),
++                "tokenized_dataset": str(tokenized_dataset),
++                # "train_input_ids_max_length": max(tokenized_dataset['train']['input_ids_max_length']),
++                # "test_input_ids_max_length": max(tokenized_dataset['test']['input_ids_max_length']),
++            })
++
++    def collate_fn(batch, args, tokenizer):
++        max_input_length = max([len(item['input_ids']) for item in batch])
++        max_target_length = max([len(item['labels']) for item in batch])
++        max_prefix_length = max([len(item['prefix']) for item in batch])
++
++        input_ids, input_ids_left_padded = [], []
++        attention_mask, attention_mask_left_padded = [], []
++        labels, labels_left_padded = [], []
++        prefix, prefix_left_padded = [], []
++        prefix_attention_mask, prefix_attention_mask_left_padded = [], []
++
++        for item in batch:
++            # input_ids.append(item['input_ids'] + [tokenizer.pad_token_id] * (max_input_length - len(item['input_ids'])))
++            # attention_mask.append(item['attention_mask'] + [0] * (max_input_length - len(item['attention_mask'])))
++            # labels.append(item['labels'] + [-100] * (max_target_length - len(item['labels'])))
++
++            labels_left_padded.append([-100] * (max_target_length - len(item['labels'])) + item['labels'])
++            prefix_left_padded.append([tokenizer.pad_token_id] * (max_prefix_length - len(item['prefix'])) + item['prefix'])
++            prefix_attention_mask_left_padded.append(
++                [0] * (max_prefix_length - len(item['prefix_attention_mask'])) + item['prefix_attention_mask'])
++
++        ppo_forward_kwargs = {
++            'query': [item['prefix_text'] for item in batch],
++            'query_tensors': torch.LongTensor(prefix_left_padded),
++            'query_tensors_attention_mask': torch.BoolTensor(prefix_attention_mask_left_padded),
++            # 'answer_values': torch.FloatTensor([float(item['answer_value'].replace(',', '')) for item in batch]),
++            'answer_values': [item['answer_value'].replace(',', '') for item in batch],
++            'item_ids': torch.LongTensor([int(item['item_id'].split('_')[1]) for item in batch]),
++            # 'answer_cot': [item['answer_cot'] for item in batch],
++            # 'sft_model_input_ids': torch.LongTensor(input_ids),
++            # 'sft_model_attention_mask': torch.BoolTensor(attention_mask),
++            # 'sft_model_labels': torch.LongTensor(labels),
++        }
++        generate_prefix_kwargs = {
++            'input_ids': torch.LongTensor(prefix_left_padded),
++            'attention_mask': torch.BoolTensor(prefix_attention_mask_left_padded),
++            'labels': torch.LongTensor(labels_left_padded)
++        }
++
++        return {
++            'ppo_forward_kwargs': ppo_forward_kwargs,
++            'generate_prefix_kwargs': generate_prefix_kwargs,
++        }
++
++    train_dataloader = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=args['batch_size'],
++                                  num_workers=args['num_workers'], pin_memory=True,
++                                  collate_fn=partial(collate_fn, args=args, tokenizer=tokenizer))
++
++    test_dataloader = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=args['eval_batch_size'],
++                                 num_workers=args['num_workers'], pin_memory=True,
++                                 collate_fn=partial(collate_fn, args=args, tokenizer=tokenizer))
++
++    return (tokenized_dataset['train'], train_dataloader), (tokenized_dataset['test'], test_dataloader)
++
++
++def prepare_datasets_and_data_loaders_idefics2(args, processor):
++    data_collator = MyDataCollator(processor)
++
++    train_dataset = ClverMathDataset(args['train_file'], 'train')
++    train_dataloader = DataLoader(
++        train_dataset,
++        batch_size=args['batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=True,
++    )
++
++    val_dataset = ClverMathDataset(args['train_file'], 'validation')
++    val_dataloader = DataLoader(
++        val_dataset,
++        batch_size=args['eval_batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=False,
++        drop_last=False
++    )
++
++    test_dataset = ClverMathDataset(args['train_file'], 'test')
++    test_dataloader = DataLoader(
++        test_dataset,
++        batch_size=args['eval_batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=False,
++        drop_last=False
++    )
++
++    if accelerator.is_main_process and args['wandb_log']:
++        wandb.config.update({
++            "train_dataset_size": len(train_dataset),
++            "val_dataset_size": len(val_dataset),
++            "test_dataset_size": len(test_dataset),
++        })
++
++    return (train_dataset, train_dataloader), (val_dataset, val_dataloader), (test_dataset, test_dataloader)
++
++
++def do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths=None):
++    os.makedirs(save_path, exist_ok=True)
++    unwrapped_model = accelerator.unwrap_model(model)
++    unwrapped_model.save_pretrained(save_path, is_main_process=accelerator.is_main_process,
++                                    save_function=accelerator.save, state_dict=accelerator.get_state_dict(model))
++    tokenizer.save_pretrained(save_path)
++    if accelerator.is_main_process and most_recent_ckpts_paths is not None:
++        most_recent_ckpts_paths.append(save_path)
++        if args['keep_num_ckpt'] is not None and len(most_recent_ckpts_paths) > args['keep_num_ckpt']:
++            ckpt_to_be_removed = most_recent_ckpts_paths.pop(0)
++            # os.remove(ckpt_to_be_removed)
++            shutil.rmtree(ckpt_to_be_removed)
++
++def rollout(args, model, ref_model, processor, tokenizer, query_tensors, query_tensors_attention_mask, answer_values, src_name):
++    model.eval()
++    with torch.no_grad():
++        gen_output = model.module.generate(
++                        input_ids=query_tensors,
++                        attention_mask=query_tensors_attention_mask,
++                        # max_length=args['max_input_length'],
++                        # output_scores=True,
++                        # return_dict_in_generate=True,
++                        # num_beams=1,
++                        top_k=0.0, top_p=1.0,
++                        do_sample=True,
++                        use_cache=True,
++                        # do_sample=False,
++                        pad_token_id=tokenizer.pad_token_id,
++                        eos_token_id=tokenizer.eos_token_id,
++                        max_new_tokens=args['max_gen_length'],
++                    )
++
++        # accelerator.unwrap_model(model).generate(
++        #     input_ids=query_tensors,
++        #     attention_mask=query_tensors_attention_mask,
++        #     top_k=0.0, top_p=1.0,
++        #     do_sample=True,
++        #     # output_scores=True,
++        #     # return_dict_in_generate=True,
++        #     pad_token_id=tokenizer.pad_token_id,
++        #     # bos_token_id=tokenizer.bos_token_id,
++        #     eos_token_id=tokenizer.eos_token_id,
++        #     max_length=args['max_gen_length'],
++        # )
++        # completed_tensors, logits_per_steps = gen_output[0], gen_output[1]
++        completed_tensors = gen_output
++        completed_tensors = pad_across_processes(completed_tensors, dim=1, pad_index=tokenizer.pad_token_id, pad_first=False)
++
++    # Evaluate score
++    completed_texts = processor.batch_decode(completed_tensors, skip_special_tokens=True)
++    pred_ans = [x.split("Assistant: ")[1].strip() for x in completed_texts]    # -1 removes "."
++    pred_ans = [x[:-1] if x[-1] == '.' else x for x in pred_ans]
++
++    # programs = [text.strip().split(cot_trigger)[-1].strip() for text in completed_texts]
++    # execute_fn = post_process_answer_cot_fn_mapper[(args['engine'], src_name)]
++
++    correctness = []
++    for pred, target in zip(pred_ans, answer_values):
++        if pred == str(target.detach().cpu().numpy()):
++            is_correct = 1
++        else:
++            is_number = False
++            try:
++                float(pred)
++                is_number = True
++            except:
++                pass
++            if is_number:
++                is_correct = 0.1
++            else:
++                is_correct = 0
++        correctness.append(is_correct)
++
++        # target_value = post_process_final_answer_fn_mapper[src_name](answer_values[i])
++        # if extracted_ans is not None:
++        #     if args['engine'] == 'game24' or args['engine'] == 'calcn':
++        #         is_correct = extracted_ans
++        #     else:
++        #         if compare_answer_fn_mapper[src_name](extracted_ans, target_value):
++        #             is_correct = 1
++        #         else:
++        #             is_correct = 0.1
++        #             # for mathqa, even though it can executed, if the results is not within a,b,c,d,xxx, still zero reward
++        #             # because we want to give some reward for the prediction that able to select one of the answer
++        #             # for example, the executed answer is "{}" in mathqa.
++        #             # THIS PART IS TO BE DECIDED.
++        #             # if src_name == 'mathqa' and not (len(extracted_ans) == 1 and extracted_ans.isalpha()):
++        #             #     is_correct = 0
++        # else:
++        #     is_correct = 0
++        # correctness.append(is_correct)
++
++    model_input_ids = completed_tensors
++    model_attention_mask = (completed_tensors != tokenizer.pad_token_id)
++    with torch.no_grad():
++        # Get old logprob and val
++        lm_logits, _dummy2, val = model(input_ids=model_input_ids, attention_mask=model_attention_mask)
++        old_logprob = logprobs_from_logits(lm_logits[:, :-1, :], labels=model_input_ids[:, 1:])  # (bs, seqlen-1)
++
++        # Get the ref model logprob
++        ref_logprob = None
++        if ref_model is not None:
++            ref_lm_output = ref_model(input_ids=model_input_ids, attention_mask=model_attention_mask)
++            ref_lm_logits = ref_lm_output.logits
++            ref_logprob = logprobs_from_logits(ref_lm_logits[:, :-1, :], labels=model_input_ids[:, 1:])  # (bs, seqlen-1)
++
++    # Masking the last prompt token up untils the token before eos_token_id
++    prompt_len = query_tensors.size(1)
++    mask = torch.zeros_like(model_input_ids, dtype=torch.bool)  # (bs, seqlen)
++    mask[:, query_tensors.size(1) - 1: -1] = 1
++    score_rew = np.zeros(mask.shape)  # (bs, seqlen)
++    score_rew[:, -2] = np.array(correctness)
++    nonzero = (model_input_ids == tokenizer.eos_token_id).nonzero()
++    for (bidx, tidx) in nonzero:
++        mask[bidx][tidx:] = 0
++        score_rew[bidx][tidx:] = 0
++        score_rew[bidx][tidx - 1] = correctness[bidx]
++
++    # Make the kl reward and the full reward
++    kl_rew = None
++    rew = score_rew
++    if ref_logprob is not None:
++        kl = old_logprob - ref_logprob  # (bs, seqlen-1)
++        kl = (kl.float() * mask[:, :-1]).cpu().numpy()
++        kl_rew = np.zeros(mask.shape)  # (bs, seqlen)
++        kl_rew[:, :-1] = -kl # NOTE the minus sign
++
++        kl_coef = args["kl_coef"]
++        rew = score_rew + kl_coef * kl_rew
++
++    # Process val ret adv logprob
++    val = (val.float() * mask).cpu().numpy()
++    gamma = args["gamma"]
++    lam = args["lam"]
++    # ret = np.zeros_like(rew)
++    adv = np.zeros_like(rew)
++    for i in range(len(rew)):
++        cur_rew, cur_val = rew[i], val[i]
++        cur_delta = -cur_val[:-1] + cur_rew[:-1] + gamma * cur_val[1:]
++        cur_adv = discount_cumsum(cur_delta, discount=gamma * lam)
++        cur_adv[:prompt_len - 1] = 0
++        adv[i][:-1] = cur_adv
++
++    # lambda_return = GAE + values
++    ret = adv + val  # (bs, seqlen)
++
++    rew = torch.tensor(rew, device=mask.device, dtype=old_logprob.dtype) * mask
++    score_rew = torch.tensor(score_rew, device=mask.device, dtype=old_logprob.dtype) * mask
++    if kl_rew is not None:
++        kl_rew = torch.tensor(kl_rew, device=mask.device, dtype=old_logprob.dtype) * mask
++    ret = torch.tensor(ret, device=mask.device, dtype=old_logprob.dtype) * mask
++    val = torch.tensor(val, device=mask.device, dtype=old_logprob.dtype) * mask
++    adv = torch.tensor(adv, device=mask.device, dtype=old_logprob.dtype) * mask
++    old_logprob = old_logprob * mask[:, :-1]
++
++    ## Debug
++    # accelerator.print("padded_prompt_len:", prompt_len)
++    # accelerator.print("model_input_ids:", tokenizer.batch_decode(model_input_ids[:1].cpu().numpy().tolist()))
++    # accelerator.print("model_attention_mask:", model_attention_mask[:1].cpu().float().numpy().tolist())
++    # accelerator.print("mask:", mask[:1].cpu().float().numpy().tolist())
++    # accelerator.print("rew:", rew[:1].cpu().float().numpy().tolist())
++    # accelerator.print("ret:", ret[:1].cpu().float().numpy().tolist())
++    # accelerator.print("val:", val[:1].cpu().float().numpy().tolist())
++    # accelerator.print("adv:", adv[:1].cpu().float().numpy().tolist())
++    # accelerator.print("old_logprob:", old_logprob[:1].cpu().float().numpy().tolist())
++
++    model.train()
++    return model_input_ids, model_attention_mask, mask, rew, score_rew, kl_rew, ret, correctness, val, old_logprob, ref_logprob, adv
++
++def train_one_epoch(args, model, ref_model, train_dataset, train_dataloader, optimizer, scheduler, processor, tokenizer,
++                    global_step, global_iter_num, val_dataset, val_dataloader, test_dataset, test_dataloader,
++                    prefix, epoch, best_eval_log_dict, summary_log_dict, most_recent_ckpts_paths):
++    model_dir = args['model_dir']
++    clip_grad_norm = args.get('clip_grad_norm', None)
++    vf_coef = args['vf_coef']
++    evaluating_step_freq = args.get('evaluating_step_freq', None)
++    logging_step_freq = args.get('logging_step_freq', None)
++    saving_step_freq = args.get('saving_step_freq', None)
++    model.train()
++    epoch_result_dict = defaultdict(list)
++    with tqdm(enumerate(train_dataloader), total=len(train_dataloader), disable=not accelerator.is_main_process, desc='Train Loop') as t:
++        for idx, batch in t:
++            result_dict = defaultdict(list)
++            # Do rollout first
++            model.eval()
++            model_input_ids, model_attention_mask, mask, rew, score_rew, kl_rew, ret, correctness, val, old_logprob, ref_logprob, adv = rollout(
++                args, model, ref_model, processor, tokenizer,
++                query_tensors=batch['input_ids'],
++                query_tensors_attention_mask=batch['attention_mask'],
++                answer_values=batch['answers'],
++                src_name=None,
++            )
++            model.train()
++            # preprocess
++            raw_adv = adv
++            if args['adv_whitening'] == 'global':
++                adv = allgather_masked_whiten(adv, mask) # (mini_bs, seqlen)
++            elif args['adv_whitening'] == 'local':
++                adv = masked_whiten(adv, mask)
++
++            batch_size_per_gpu = batch['input_ids'].size(0)
++            mini_batch_size_per_gpu = args["mini_batch_size"]
++            ppo_epochs = args["ppo_epochs"]
++            train_stats = {}
++            for _ in range(ppo_epochs):
++                perms = torch.randperm(batch_size_per_gpu)
++                for mini_idx in range(0, len(perms), mini_batch_size_per_gpu):
++                    b_inds = perms[mini_idx: mini_idx + mini_batch_size_per_gpu]
++                    # Subset to batch
++                    cur_val = val[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_old_logprob = old_logprob[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_mask = mask[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_rew = rew[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_score_rew = score_rew[b_inds].contiguous() # mini_bs x seqlen
++                    cur_kl_rew = None if kl_rew is None else kl_rew[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_ret = ret[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_adv = adv[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_raw_adv = raw_adv[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_model_input_ids = model_input_ids[b_inds].contiguous()  # mini_bs x seqlen
++                    cur_model_attention_mask = model_attention_mask[b_inds].contiguous()  # mini_bs x seqlen
++
++                    resp_len_per_sample = torch.clamp(torch.sum(cur_mask, dim=1), min=1.0)  # (mini_bs,)
++                    cur_query_mask = torch.logical_xor(cur_mask, cur_model_attention_mask)  # (mini_bs, seqlen)
++                    query_len_per_sample = torch.clamp(torch.sum(cur_query_mask, dim=1), min=1.0)  # (mini_bs,)
++
++                    # Preprocess advantage and get metrics
++                    cur_mask = cur_mask.type(cur_adv.dtype).contiguous()
++                    mean_adv, var_adv = masked_mean(cur_adv, cur_mask), masked_var(cur_adv, cur_mask)
++
++                    # Forward current model
++                    model.eval()
++                    lm_logits, _, vpreds = model(input_ids=cur_model_input_ids, attention_mask=cur_model_attention_mask)
++                    logprob = logprobs_from_logits(lm_logits[:, :-1, :], cur_model_input_ids[:, 1:])  # (mini_bs, seqlen-1)
++
++                    # Compute losses
++                    loss = 0
++
++                    # policy gradient loss
++                    ratio = torch.exp(logprob - cur_old_logprob)
++                    pg_losses = -cur_adv[:, :-1] * ratio
++                    pg_losses2 = -cur_adv[:, :-1] * torch.clamp(ratio, 1.0 - 0.2, 1.0 + 0.2)
++                    pg_loss = ((torch.max(pg_losses, pg_losses2) * cur_mask[:, :-1]).sum(dim=-1) / resp_len_per_sample).mean()
++                    # pg_loss = (torch.max(pg_losses, pg_losses2) * cur_mask[:, :-1]).sum() / cur_mask[:, :-1].sum()
++                    # pg_loss = (-logprob * cur_ret[:,:-1]).sum() / cur_mask[:, :-1].sum()
++
++                    # value loss
++                    vpredclipped = torch.max(torch.min(vpreds, cur_val + 0.2), cur_val - 0.2)
++                    vf_losses1 = (vpreds - cur_ret) ** 2
++                    vf_losses2 = (vpredclipped - cur_ret) ** 2
++                    vf_loss = 0.5 * ((torch.max(vf_losses1, vf_losses2) * cur_mask).sum(dim=-1) / resp_len_per_sample).mean()
++                    # vf_loss = 0.5 * ((torch.max(vf_losses1, vf_losses2) * cur_mask).sum() / cur_mask.sum())
++
++                    # total loss
++                    loss += pg_loss + vf_coef * vf_loss
++
++                    # model_output = model(input_ids=model_input_ids, attention_mask=model_attention_mask)
++                    # logits = model_output[0]
++                    # logprob_dist = torch.nn.functional.log_softmax(logits,dim=-1)
++                    # logprob = torch.gather(logprob_dist, 2, model_input_ids[:, 1:].unsqueeze(2)).squeeze(-1)
++                    # loss_pg = (-logprob * ret[:,:-1]).sum() / torch.maximum(torch.sum(mask[:,:-1]), torch.tensor(1.0))
++                    # loss += loss_pg
++
++                    # sft_model_input_ids = batch['ppo_forward_kwargs']['sft_model_input_ids']
++                    # sft_model_attention_mask = batch['ppo_forward_kwargs']['sft_model_attention_mask']
++                    # sft_model_labels = batch['ppo_forward_kwargs']['sft_model_labels']
++                    # loss_sft = model(input_ids=sft_model_input_ids, attention_mask=sft_model_attention_mask, labels=sft_model_labels)[0]
++                    # loss += loss_sft
++
++                    # token related metrics
++                    mean_query_len = torch.mean(allgather(torch.mean(query_len_per_sample)))
++                    std_query_len = torch.mean(allgather(torch.std(query_len_per_sample)))
++                    mean_resp_len = torch.mean(allgather(torch.mean(resp_len_per_sample)))
++                    std_resp_len = torch.mean(allgather(torch.std(resp_len_per_sample)))
++
++                    # value related metrics
++                    # vf_expl_var_num = torch.var(torch.masked_select(cur_ret - vpreds, cur_mask.bool()))
++                    # vf_expl_var_dem = torch.var(torch.masked_select(cur_ret, cur_mask.bool()))
++                    vf_expl_var_num = masked_var(cur_ret - vpreds, cur_mask)
++                    vf_expl_var_dem = masked_var(cur_ret, cur_mask)
++                    vf_expl_var = 1.0 - vf_expl_var_num / (vf_expl_var_dem + 1e-8)
++                    vf_expl_var = max(-1.0, vf_expl_var.item())  # the truncated value suffices
++                    mean_vpred = masked_mean(vpreds, cur_mask)
++                    mean_return = masked_mean(cur_ret, cur_mask)
++                    mean_reward = masked_mean(cur_rew, cur_mask)
++                    mean_score_reward = masked_mean(cur_score_rew, cur_mask)
++                    mean_kl_reward = 0.0 if cur_kl_rew is None else masked_mean(cur_kl_rew, cur_mask)
++                    mean_kcxkl_reward = args["kl_coef"] * mean_kl_reward
++
++                    # policy related metrics
++                    mean_ratio = masked_mean(ratio, cur_mask[:, :-1])
++                    #mean_adv = masked_mean(cur_adv[:, :-1], cur_mask[:, :-1])
++                    mean_logprob = masked_mean(logprob, cur_mask[:, :-1])
++                    # sequence-level kl
++                    mean_seq_kl = -1.0
++                    if cur_kl_rew is not None:
++                        cur_kl = -cur_kl_rew
++                        seq_kl = torch.sum(cur_kl * cur_mask, dim=1)  # (mini_bs,)
++                        mean_seq_kl = torch.mean(seq_kl)
++
++                    # Update
++                    epoch_result_dict['loss'].append(loss.item())
++
++                    # accelerator.backward(loss)
++                    # accelerator.deepspeed_engine_wrapped.backward(loss)
++                    # runs backpropagation and handles mixed precision
++                    # FIXME: deepspeed.utils.safe_get_full_grad(p) returns None
++                    # FIXME: Is it required as I am not using DEEPSPEED?
++                    # if accelerator.distributed_type == "DEEPSPEED":
++                    #     accelerator.deepspeed_engine_wrapped.engine.backward(loss)
++                    #     total_grad_norm = 0.0
++                    #     for n, p in model.named_parameters():
++                    #         cur_grad = deepspeed.utils.safe_get_full_grad(p).view(-1)
++                    #         cur_grad_norm_sqrt = torch.norm(cur_grad, 2)
++                    #         if cur_grad_norm_sqrt < 1e-8:
++                    #             accelerator.print(f'{n} grad_norm_sqrt: {cur_grad_norm_sqrt}')
++                    #         total_grad_norm += cur_grad_norm_sqrt ** 2
++                    #     total_grad_norm = total_grad_norm ** 0.5
++                    #     # Deepspeed's `engine.step` performs the following operations:
++                    #     # - gradient accumulation check
++                    #     # - gradient clipping
++                    #     # - optimizer step
++                    #     # - zero grad
++                    #     # - checking overflow
++                    #     # - lr_scheduler step (only if engine.lr_scheduler is not None)
++                    #     accelerator.deepspeed_engine_wrapped.engine.step()
++                    # else:
++                    accelerator.backward(loss)
++                    #accelerator.backward(loss)
++                    total_grad_norm = -1.0
++                    if clip_grad_norm is not None:
++                        total_grad_norm = accelerator.clip_grad_norm_(model.parameters(), clip_grad_norm)
++
++                    optimizer.step()
++                    model.zero_grad()
++                    optimizer.zero_grad()
++
++                    # Update running stats
++                    n_correct, total = do_gather([sum(correctness), len(correctness)])
++                    train_stats["acc"] = n_correct / total
++                    train_stats["ncor"] = n_correct
++                    train_stats["total"] = total
++                    train_stats['pg_loss'] = pg_loss.item()
++                    train_stats['vf_loss'] = vf_loss.item()
++                    train_stats['vf_expl_var'] = vf_expl_var
++
++                    for k, v in train_stats.items():
++                        result_dict[k].append(v)
++
++                    total_param_norm = 0.0
++                    # FIXME: have commented for the time being
++                    # FIXME: Is it required as I am not using DEEPSPEED?
++                    # if accelerator.distributed_type == "DEEPSPEED":
++                    #     for n, p in model.named_parameters():
++                    #         cur_param = deepspeed.utils.safe_get_full_fp32_param(p).view(-1)
++                    #         total_param_norm += torch.norm(cur_param, 2) ** 2
++                    #     total_param_norm = total_param_norm ** 0.5
++                    # else:
++                    total_param_norm = torch.norm(
++                        torch.cat([p.view(-1) for p in model.parameters()]),
++                        p=2  # L2 norm
++                    )
++                    # logging
++                    if accelerator.is_main_process and args['wandb_log']:
++                        wandb.log({
++                            "nn/total_grad_norm": total_grad_norm,
++                            "nn/total_param_norm": total_param_norm,
++                            "nn/lr": scheduler.get_last_lr()[0],
++                        }, step=global_iter_num)
++                        wandb.log({
++                            "acc/acc": train_stats["acc"],
++                            "acc/ncor": train_stats["ncor"],
++                            "acc/total": train_stats["total"],
++                        }, step=global_iter_num)
++                        wandb.log({
++                            "loss/loss:": loss,
++                            "loss/pg_loss": pg_loss,
++                            "loss/vf_loss": vf_loss,
++                        }, step=global_iter_num)
++                        wandb.log({
++                            "tokens/mean_query_len": mean_query_len,
++                            "tokens/std_query_len": std_query_len,
++                            "tokens/mean_resp_len": mean_resp_len,
++                            "tokens/std_resp_len": std_resp_len,
++                        }, step=global_iter_num)
++                        wandb.log({
++                            "policy/mean_ratio": mean_ratio,
++                            "policy/mean_adv": mean_adv,
++                            "policy/var_adv": var_adv,
++                            "policy/mean_logprob": mean_logprob,
++                            "policy/mean_seq_kl": mean_seq_kl,
++                        }, step=global_iter_num)
++                        wandb.log({
++                            "value/vf_expl_var": vf_expl_var,
++                            "value/mean_vpred": mean_vpred,
++                            "value/mean_return": mean_return,
++                            "value/mean_reward": mean_reward,
++                            "value/mean_score_reward": mean_score_reward,
++                            "value/mean_kl_reward": mean_kl_reward,
++                            "value/mean_kcxkl_reward": mean_kcxkl_reward,
++                        }, step=global_iter_num)
++                    # Update iter num
++                    # torch.distributed.barrier()
++                    global_iter_num += 1
++
++            scheduler.step()
++            global_step += 1
++            # accelerator.empty_cache()
++            # Step update metric
++            epoch_result_dict['loss'].append(loss.item())
++            for k, v in train_stats.items():
++                epoch_result_dict[k].append(v)
++
++            # Step evaluating
++            eval_log_dict = {}
++            test_log_dict = {}
++            is_best = False
++            if evaluating_step_freq is not None and global_step % evaluating_step_freq == 0:
++                accelerator.print(f"Step {global_step} Evaluating...")
++                eval_gen_stats = evaluate_generation(args, model, val_dataset, val_dataloader, processor, tokenizer)
++                evaluate_result_dict = {f'Eval.Gen.{k}':  v for k, v in eval_gen_stats.items()}
++                eval_log_dict.update(evaluate_result_dict)
++                if eval_log_dict['Eval.Gen.value_accuracy'] > best_eval_log_dict.get('Eval.Gen.value_accuracy_best', 0):
++                    is_best = True
++                    best_eval_log_dict['Eval.Gen.value_accuracy_best'] = eval_log_dict['Eval.Gen.value_accuracy']
++                if 'Eval.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Eval.Gen.value_accuracy'] = []
++                summary_log_dict['Eval.Gen.value_accuracy'].append(eval_log_dict['Eval.Gen.value_accuracy'])
++
++                test_result_dict = {f'Test.Gen.{k}':  v for k, v in evaluate_generation(args, model, test_dataset, test_dataloader, processor, tokenizer).items()}
++                test_log_dict.update(test_result_dict)
++                if 'Test.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Test.Gen.value_accuracy'] = []
++                summary_log_dict['Test.Gen.value_accuracy'].append(test_log_dict['Test.Gen.value_accuracy'])
++
++            # Step logging
++            train_log_dict = {}
++            if logging_step_freq is not None and global_step % logging_step_freq == 0:
++                train_log_dict = {f'T.{k}': sum(v) / len(v) if isinstance(v, list) else v for k, v in epoch_result_dict.items()}
++
++            if eval_log_dict or train_log_dict:
++                log_dict = {'lr': scheduler.get_last_lr()[0], **train_log_dict, **eval_log_dict, **best_eval_log_dict, **test_log_dict}
++                if accelerator.is_main_process and args['wandb_log']:
++                    wandb.log(log_dict, step=global_step)
++                    log_dict = {'wandb': args['wandb_project'] + '|' + args['wandb_run_name'], **log_dict}
++                log_dict = {k: f'{v:.5g}' if isinstance(v, float) else v for k,v in log_dict.items()}
++                accelerator.print(f"{prefix}[E={epoch}/{args['n_epochs']}, S={global_step}] {log_dict}")
++
++            # Step saving
++            if saving_step_freq is not None and global_step % saving_step_freq == 0:
++                if is_best:
++                    save_path = os.path.join(model_dir, f'best')
++                    do_checkpoint(args, model, tokenizer, save_path)
++                    accelerator.print(f"Saved best model at {save_path}")
++                if args['keep_num_ckpt'] > 0:
++                    save_path = os.path.join(model_dir, f'global_step_{str(global_step)}')
++                    do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths)
++                    accelerator.print(f"Saved model at {save_path}")
++
++            # Keep only max_record items
++            for k, v in epoch_result_dict.items():
++                if len(v) > 1:
++                    epoch_result_dict[k] = v[-1:]
++
++    # Metric summary:
++    epoch_result_dict = {k: (sum(v) / len(v) if isinstance(v, list) else v) for k, v in epoch_result_dict.items()}
++    return epoch_result_dict, global_step, global_iter_num
++
++
++def evaluate_generation(args, model, dataset, dataloader, processor, tokenizer):
++    model.eval()
++    predictions = []
++    targets = []
++    templates = []
++    for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader), disable=not accelerator.is_main_process, desc='Evaluation Gen Loop'):
++        batch_templates = batch['templates']
++        # remove 'templates' from batch
++        batch.pop('templates')
++        batch.pop('answers')
++        output_ = model.module.generate(
++                        **batch,
++                        # max_length=args['max_input_length'],
++                        # output_scores=True,
++                        return_dict_in_generate=True,
++                        num_beams=1,
++                        use_cache=True,
++                        do_sample=False,
++                        pad_token_id=tokenizer.pad_token_id,
++                        eos_token_id=tokenizer.eos_token_id,
++                        max_new_tokens=16,
++                    )
++
++        generated_ids = output_.sequences
++        generated_ids = pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        labels = batch['labels']
++        # labels = pad_across_processes(labels, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        # labels[labels==-100]=tokenizer.pad_token_id
++
++        generated_ids, labels = accelerator.gather(generated_ids), accelerator.gather(labels)
++
++        generated_texts = processor.batch_decode(generated_ids, skip_special_tokens=True)
++        pred_ans = [x.split("Assistant: ")[1][:-1].strip() for x in generated_texts]    # -1 removes "."
++        # pred_ans = pred_ans.strip()
++
++        # generated_ids = output_.sequences
++        # generated_ids = pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++
++        # labels = batch['generate_prefix_kwargs']['labels']
++        # labels = pad_across_processes(labels, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        # labels[labels==-100]=tokenizer.pad_token_id
++
++        # generated_ids, labels = accelerator.gather(generated_ids), accelerator.gather(labels)
++
++        # preds = [tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip() for g in generated_ids]
++        predictions.extend(pred_ans)
++        # target = [tokenizer.decode(t, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip() for t in labels]
++        targets.extend(labels)
++        templates.extend(batch_templates)
++
++    predictions = predictions[:len(dataset)]
++    targets = targets[:len(dataset)]
++    templates = templates[:len(dataset)]
++
++    if accelerator.is_main_process and accelerator.is_local_main_process:
++        results = []
++        corr = 0
++        total = 0
++        temp_based_acc = {}
++        for pred, tar, temp in zip(predictions, targets, templates):
++            tar = str(tar.detach().cpu().numpy())
++            cur_res = {
++                'pred': pred,
++                'target': tar,
++            }
++            results.append(cur_res)
++
++            temp = str(temp.detach().cpu().numpy())
++            if temp not in temp_based_acc:
++                temp_based_acc[temp] = {}
++                temp_based_acc[temp]['corr'] = 0
++                temp_based_acc[temp]['total'] = 0
++
++            if pred == tar:
++                corr += 1
++                temp_based_acc[temp]['corr'] += 1
++            total += 1
++            temp_based_acc[temp]['total'] += 1
++
++        # save first before execute to trace error.
++        res_path = args['model_dir'].rstrip('/')+ '/' + '_res.json'
++        accelerator.print(f"Saving results to {res_path}")
++        with open(res_path, 'w') as f:
++            json.dump(results, f, indent=2)
++
++        # if args['wandb_log']:
++        #     table = wandb.Table(dataframe=pd.DataFrame(results))
++        #     wandb.log({"predictions": table})
++
++        value_accuracy = corr / len(results) * 100
++        accelerator.print(f"[Eval Info] value_accuracy: {value_accuracy:.5g}%")
++        value_accuracy = torch.FloatTensor([value_accuracy]).to(accelerator.device)
++
++        templates_value_accuracy = {}
++        for temp, acc in temp_based_acc.items():
++            acc = acc['corr'] / acc['total'] * 100
++            temp_name = ID_TO_TEMPLATE[int(temp)]
++            accelerator.print(f"[Eval Info] value_accuracy on {temp_name} category: {acc:.5g}%")
++            templates_value_accuracy[temp_name] = torch.FloatTensor([acc]).to(accelerator.device)
++    else:
++        value_accuracy = torch.FloatTensor([-1.0]).to(accelerator.device)
++        templates_value_accuracy = {k: torch.FloatTensor([-1.0]).to(accelerator.device) for k in ID_TO_TEMPLATE.values()}
++
++    value_accuracy = broadcast(value_accuracy).cpu().numpy().tolist()[0]
++    for temp_category, acc in templates_value_accuracy.items():
++        templates_value_accuracy[temp_category] = broadcast(acc).cpu().numpy().tolist()[0]
++
++    # Metric summary:
++    out_stats = {'value_accuracy': value_accuracy}
++    for temp_category, acc in templates_value_accuracy.items():
++        out_stats[temp_category] = acc
++
++    model.train()
++    return out_stats
++
++
++def main(args):
++    set_seed(args['seed'] + accelerator.process_index)
++
++    if accelerator.is_main_process and args['wandb_log']:
++        wandb.init(project=args['wandb_project'], name=args['wandb_run_name'])
++        wandb.config.update(args)
++
++    model, tokenizer, processor = create_idefics_model_rl(args)
++
++    # tokenizer = AutoTokenizer.from_pretrained(args['tokenizer_name_or_path'], use_fast=True)
++    # tokenizer.pad_token_id = 1
++    # tokenizer.eos_token_id = 2
++
++    # # MODEL_CLASS = AutoModelForCausalLMWithValueHead
++    # MODEL_CLASS = Idefics2ForConditionalGenerationwithValueHead
++    # model = MODEL_CLASS.from_pretrained(args['model_name_or_path'])
++    # model = Idefics2ForConditionalGeneration.from_pretrained(model_config.model_name_or_path, **model_kwargs)
++    # accelerator.print(f'[Vocab size]: {len(tokenizer)}')
++    # model.resize_token_embeddings(len(tokenizer))
++
++    (train_dataset, train_dataloader), (val_dataset, val_dataloader), (test_dataset, test_dataloader) = prepare_datasets_and_data_loaders_idefics2(args, processor)
++
++    # initialize ref model (if any)
++    ref_model = None
++    if args['ref_model_name_or_path']:
++        bnb_config = None
++        if args['use_qlora']:
++            bnb_config = BitsAndBytesConfig(
++                load_in_4bit=True,
++                bnb_4bit_quant_type="nf4",
++                bnb_4bit_compute_dtype=torch.float16
++            )
++        # ref_model = AutoModelForCausalLMWithValueHead.from_pretrained(args['ref_model_name_or_path'])
++        ref_model = Idefics2ForConditionalGeneration.from_pretrained(
++            args['ref_model_name_or_path'],
++            torch_dtype=torch.float16,
++            low_cpu_mem_usage=True,
++            quantization_config=bnb_config if args['use_qlora'] else None,
++        )
++        # from copy import deepcopy
++        # ref_model = deepcopy(model)
++
++    # optimizer
++    n_epochs = args['n_epochs']
++    num_training_steps = (len(train_dataloader) // accelerator.num_processes * n_epochs)
++    warmup_step = args['warmup_step'] if args['warmup_step'] is not None and args['warmup_step'] >= 0 else int(0.1 * num_training_steps)
++
++    optimizer = torch.optim.AdamW(model.parameters(), lr=args['learning_rate'], eps=1e-8)
++    # optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=args['learning_rate'], eps=1e-8)
++    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=num_training_steps)
++    scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step)
++    model, optimizer, train_dataloader, val_dataloader, test_dataloader = accelerator.prepare(model, optimizer, train_dataloader,
++                                                                              val_dataloader, test_dataloader)
++    # if ref_model is not None:
++    #     # FIXME: commented it out for now
++    #     # if accelerator.distributed_type == "DEEPSPEED":
++    #     #     ref_model = prepare_deepspeed_ref_model(ref_model)
++    #     # else:
++    #     ref_model = accelerator.prepare(ref_model)
++
++    global_step = 0
++    global_iter_num = 0
++    evaluating_epoch_freq = args['evaluating_epoch_freq']
++    logging_epoch_freq = args['logging_epoch_freq']
++    saving_epoch_freq = args['saving_epoch_freq']
++    model_dir = args['model_dir']
++    best_eval_log_dict = {}
++    summary_log_dict = {}
++    os.makedirs(model_dir, exist_ok=True)
++    most_recent_ckpts_paths = []
++    with tqdm(range(1, n_epochs+1), total=n_epochs, disable=False) as t:
++        for epoch in t:
++            kwargs = {
++                'args': args,
++                'model': model,
++                'ref_model': ref_model,
++                'train_dataset': train_dataset,
++                'train_dataloader': train_dataloader,
++                'val_dataset': val_dataset,
++                'val_dataloader': val_dataloader,
++                'test_dataset': test_dataset,
++                'test_dataloader': test_dataloader,
++                'optimizer': optimizer,
++                'scheduler': scheduler,
++                'global_step': global_step,
++                'global_iter_num': global_iter_num,
++                'processor': processor,
++                'tokenizer': tokenizer,
++                'prefix': '',
++                'epoch': epoch,
++                'best_eval_log_dict': best_eval_log_dict,
++                'summary_log_dict': summary_log_dict,
++                'most_recent_ckpts_paths': most_recent_ckpts_paths,
++            }
++            train_epoch_result_dict, global_step, global_iter_num = train_one_epoch(**kwargs)
++
++            eval_log_dict = {}
++            test_log_dict = {}
++            is_best = False
++            if evaluating_epoch_freq is not None and epoch % evaluating_epoch_freq == 0:
++                evaluate_result_dict = {f'Eval.Gen.{k}':  v for k, v in
++                                        evaluate_generation(args, model, val_dataset, val_dataloader, processor, tokenizer).items()}
++                eval_log_dict.update(evaluate_result_dict)
++                if eval_log_dict['Eval.Gen.value_accuracy'] > best_eval_log_dict.get('Eval.Gen.value_accuracy_best', -1):
++                    is_best = True
++                    best_eval_log_dict['Eval.Gen.value_accuracy_best'] = eval_log_dict['Eval.Gen.value_accuracy']
++                if 'Eval.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Eval.Gen.value_accuracy'] = []
++                summary_log_dict['Eval.Gen.value_accuracy'].append(eval_log_dict['Eval.Gen.value_accuracy'])
++
++                test_result_dict = {f'Test.Gen.{k}':  v for k, v in evaluate_generation(args, model, test_dataset, test_dataloader, processor, tokenizer).items()}
++                test_log_dict.update(test_result_dict)
++                if 'Test.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Test.Gen.value_accuracy'] = []
++                summary_log_dict['Test.Gen.value_accuracy'].append(test_log_dict['Test.Gen.value_accuracy'])
++
++            train_log_dict = {}
++            if logging_epoch_freq is not None and epoch % logging_epoch_freq == 0:
++                train_log_dict = {f'T.{k}': sum(v) / len(v) if isinstance(v, list) else v for k, v in
++                                train_epoch_result_dict.items()}
++
++            if eval_log_dict or train_log_dict:
++                log_dict = {'lr': scheduler.get_last_lr()[0], **train_log_dict, **eval_log_dict, **best_eval_log_dict}
++                if accelerator.is_main_process and args['wandb_log']:
++                    wandb.log(log_dict, step=global_iter_num)
++                    log_dict = {'wandb': args['wandb_project'] + '|' + args['wandb_run_name'] + '|' + wandb.run.id, **log_dict}
++
++                log_dict = {k: f'{v:.5g}' if isinstance(v, float) else v for k, v in log_dict.items()}
++                accelerator.print(
++                    f"[Epoch={epoch}/{args['n_epochs']}, Step={global_step}] {log_dict}")
++
++            if saving_epoch_freq is not None and epoch % saving_epoch_freq == 0:
++                if is_best:
++                    save_path = os.path.join(model_dir, f'best')
++                    do_checkpoint(args, model, tokenizer, save_path)
++                #
++                if args['keep_num_ckpt'] > 0:
++                    # save the checkpoint only if keep num ckpt > 0
++                    save_path = os.path.join(args['model_dir'], f'global_step_{str(global_step)}_epoch_{epoch}')
++                    do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths)
++
++    return
++
++if __name__ == '__main__':
++    print("starting...")
++    from transformers import HfArgumentParser
++
++    NONE_INT = -100
++    NONE_STR = 'None'
++
++
++    @dataclass
++    class Arguments:
++        model_name_or_path: str
++        tokenizer_name_or_path: str
++        model_dir: str
++        train_file: str
++        test_file: str
++        batch_size: int = field(default=8)
++        mini_batch_size: int = field(default=8)
++        eval_batch_size: int = field(default=8)
++        ppo_epochs: int = field(default=1)
++        n_epochs: int = field(default=40)
++        num_workers: int = field(default=8)
++        learning_rate: float = field(default=2e-5)
++        weight_decay: float = field(default=1e-6)
++        warmup_step: int = field(default=0)
++        clip_grad_norm: float = field(default=1)
++        vf_coef: float = field(default=1.0)
++        kl_coef: float = field(default=0.1)
++        gamma: float = field(default=0.98)
++        lam: float = field(default=0.95)
++        ref_model_name_or_path: str = field(default="")
++        evaluating_epoch_freq: int = field(default=1)
++        logging_epoch_freq: int = field(default=1)
++        saving_epoch_freq: int = field(default=1000)
++        evaluating_step_freq: int = field(default=NONE_INT)
++        logging_step_freq: int = field(default=NONE_INT)
++        logging_seq_str_step_freq: int = field(default=NONE_INT)
++        logging_values_step_freq: int = field(default=NONE_INT)
++        saving_step_freq: int = field(default=NONE_INT)
++        seed: int = field(default=42)
++        max_input_length: int = field(default=700)
++        max_gen_length: int = field(default=700)
++        keep_num_ckpt: int = field(default=5)
++        # wandb stuff
++        wandb_log: bool = field(default=False)
++        wandb_project: str = field(default='tmp_anvfupsadfn')
++        wandb_run_name: str = field(default='default_run_name')
++        ###
++        engine: str = field(default='python')
++        adv_whitening: str = field(default='global')
++        # lora
++        use_lora: bool = field(default=False)
++        use_qlora: bool = field(default=False)
++
++    parser = HfArgumentParser(Arguments)
++    (args,) = parser.parse_args_into_dataclasses()
++    args = asdict(args)
++    for k, v in args.items():
++        if v in [NONE_INT, NONE_STR]:
++            args[k] = None
++    accelerator = Accelerator(kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=18000))])
++    accelerator.print(args)
++    accelerator.print(json.dumps(args, indent=2, ensure_ascii=False))
++    main(args)
+diff --git a/train_sft_model_vlm_tools.py b/train_sft_model_vlm_tools.py
+new file mode 100644
+index 0000000..397ec54
+--- /dev/null
++++ b/train_sft_model_vlm_tools.py
+@@ -0,0 +1,638 @@
++# Copyright 2023 Bytedance Ltd.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++
++#     http://www.apache.org/licenses/LICENSE-2.0
++
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++from accelerate import Accelerator, InitProcessGroupKwargs
++from accelerate.utils import pad_across_processes, broadcast
++from collections import defaultdict
++from dataclasses import dataclass, field, asdict
++from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, concatenate_datasets
++from datetime import timedelta
++from functools import partial
++import json
++import os
++import random
++from models.create_model import create_idefics_model
++from src.python_engine import run_python_code
++from src.utils import set_seed, floatify, compute_ETA
++from tqdm import tqdm
++import torch
++from torch.utils.data import DataLoader
++from transformers import AutoTokenizer, AutoModelForCausalLM, get_linear_schedule_with_warmup, AdamW, get_constant_schedule_with_warmup
++import wandb
++import pandas as pd
++import shutil
++from dataset.clver_math import ClverMathDataset, MyDataCollator, ID_TO_TEMPLATE
++tqdm = partial(tqdm, ncols=0, leave=False)
++
++TIMEOUT = 10
++instruction=None
++cot_trigger=None
++answer_trigger=None
++def setup_cot(src_name):
++    assert src_name in ['gsm8k', 'mathqa', 'svamp', 'mathqa-numeric']
++    global instruction
++    global cot_trigger
++    global answer_trigger
++    # Complete output is in this form: f'{instruction}{question.strip()}{cot_trigger}{answer_cot.strip()}'
++    instruction = 'Question:\n'
++    cot_trigger = '\nAnswer reasoning:\n'
++    answer_trigger = '\nTherefore, the answer is: '
++    return
++
++post_process_final_answer_fn_mapper = {
++    'gsm8k': lambda x: float(x.replace(',','').strip()),
++    'svamp': lambda x: float(x.replace(',','').strip()),
++    'mathqa': lambda x: x.lower().replace('"','').replace("'",'').strip(),
++    'mathqa-numeric': lambda x: float(x),
++}
++### the answer_cot is a list of answer_cot
++post_process_answer_cot_fn_mapper = {
++    ('python', 'gsm8k'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'svamp'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'mathqa'): lambda answer_cot: [str(res).lower().replace('"','').replace("'",'').strip() for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('python', 'mathqa-numeric'): lambda answer_cot: [floatify(res) for res in run_python_code(programs=answer_cot, TIMEOUT=TIMEOUT)],
++    ('nl', 'gsm8k'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++    ('nl', 'svamp'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++    ('nl', 'mathqa'): lambda answer_cot: [res.split(answer_trigger)[-1].lower().replace('"','').replace("'",'').strip() for res in answer_cot],
++    ('nl', 'mathqa-numeric'): lambda answer_cot: [floatify(res.split(answer_trigger)[-1].strip()) for res in answer_cot],
++}
++compare_answer_fn_mapper = {
++    'gsm8k': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++    'svamp': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++    'mathqa': lambda extracted_ans, target_answer: extracted_ans == target_answer,
++    'mathqa-numeric': lambda extracted_ans, target_answer: abs(extracted_ans - target_answer) <= 1e-2,
++}
++
++def prepare_datasets_and_data_loaders(args, tokenizer):
++    with accelerator.main_process_first():
++        raw_dataset = DatasetDict({
++            'train': Dataset.from_list(json.load(open(args['train_file'],'r'))),
++            'test': Dataset.from_list(json.load(open(args['test_file'],'r'))),
++        })
++        accelerator.print('Raw data:', raw_dataset)
++        src_name = raw_dataset['train'][0]['item_id'].split('_')[0]  # e.g., gsm8k_0, gsm8k_1, gsm8k_2, ...
++        setup_cot(src_name)
++        accelerator.print('Using instruction:', instruction)
++        accelerator.print('Using cot_trigger:', cot_trigger)
++        accelerator.print('Using answer_trigger:', answer_trigger)
++        def tokenize_fn(batch, args, tokenizer):
++            assert tokenizer.eos_token_id is not None, (tokenizer.eos_token_id, tokenizer.eos_token)
++            new_batch = defaultdict(list)
++            all_keys = list(batch.keys())
++            for item_values in zip(*(batch[k] for k in all_keys)):
++                item = {k: item_values[i] for i, k in enumerate(all_keys)}
++                item_id, question, answer_value, answer_cot = \
++                        item['item_id'], \
++                        item['question'], \
++                        item['answer_value'], \
++                        item.get('answer_cot', None), \
++
++                question = question.strip()
++                if answer_value is not None:
++                    answer_value = answer_value.strip()
++
++                if answer_cot is not None:
++                    answer_cot = answer_cot.strip()
++                    if args['engine'] == 'nl':
++                        answer_cot += f'{answer_trigger}{answer_value}'
++
++                input = f'{instruction}{question}{cot_trigger}'
++                output = f'{answer_cot}'
++                prefix_text = f'{instruction}{question}{cot_trigger}'
++
++                input_encode = tokenizer(input, add_special_tokens=False)
++                output_encode = tokenizer(output, add_special_tokens=False)
++                prefix_encode = tokenizer(prefix_text, add_special_tokens=False)
++
++                input_ids = input_encode['input_ids'] + output_encode['input_ids'] + [tokenizer.eos_token_id]
++                labels = [-100]*len(input_encode['input_ids']) + output_encode['input_ids'] + [tokenizer.eos_token_id]
++                attention_mask = [1]* len(input_ids)
++                prefix = prefix_encode['input_ids']
++                prefix_attention_mask = prefix_encode['attention_mask']
++
++                # Truncation
++                input_ids_max_length = len(input_ids)
++                # assert input_ids_max_length <= args['max_input_length'], input_ids_max_length
++                input_ids = input_ids[:args['max_input_length']]
++                labels = labels[:args['max_input_length']]
++                attention_mask = attention_mask[:args['max_input_length']]
++                prefix = prefix[:args['max_input_length']]
++                prefix_attention_mask = prefix_attention_mask[:args['max_input_length']]
++
++                ##
++                new_batch['input_ids'].append(input_ids)
++                new_batch['labels'].append(labels)
++                new_batch['attention_mask'].append(attention_mask)
++                new_batch['prefix'].append(prefix)
++                new_batch['prefix_attention_mask'].append(prefix_attention_mask)
++                ##
++                new_batch['item_id'].append(item_id)
++                new_batch['question'].append(question)
++                new_batch['answer_cot'].append(answer_cot)
++                new_batch['answer_value'].append(answer_value)
++                new_batch['input_ids_max_length'].append(input_ids_max_length)
++
++            return new_batch
++
++        tokenized_dataset = DatasetDict({
++            mode: dataset.map(
++                tokenize_fn, fn_kwargs={'args': args, 'tokenizer': tokenizer}, batched=True, remove_columns=dataset.column_names,
++                num_proc=8, load_from_cache_file=False
++            ) for mode, dataset in raw_dataset.items()})
++        accelerator.print('Processed data:', tokenized_dataset)
++        for mode, dataset in tokenized_dataset.items():
++            accelerator.print(mode, f'{mode}_input_ids_max_length', max(dataset['input_ids_max_length']))
++
++        if accelerator.is_main_process and args['wandb_log']:
++            wandb.config.update({
++                "src_name": src_name,
++                "instruction": instruction,
++                "cot_trigger": cot_trigger,
++                "answer_trigger": answer_trigger,
++                "raw_dataset": str(raw_dataset),
++                "tokenized_dataset": str(tokenized_dataset),
++                "train_input_ids_max_length": max(tokenized_dataset['train']['input_ids_max_length']),
++                "test_input_ids_max_length": max(tokenized_dataset['test']['input_ids_max_length']),
++            })
++
++    def collate_fn(batch, args, tokenizer):
++        max_input_length = max([len(item['input_ids']) for item in batch])
++        max_target_length = max([len(item['labels']) for item in batch])
++        max_prefix_length = max([len(item['prefix']) for item in batch])
++        input_ids  = []
++        attention_mask  = []
++        labels, labels_left_padded  = [], []
++        prefix_left_padded  = []
++        prefix_attention_mask_left_padded  = []
++        for item in batch:
++            input_ids.append(item['input_ids'] + [tokenizer.pad_token_id]*(max_input_length - len(item['input_ids'])))
++            attention_mask.append(item['attention_mask'] + [0]*(max_input_length - len(item['attention_mask'])))
++            labels.append(item['labels'] + [-100]*(max_target_length - len(item['labels'])))
++
++            labels_left_padded.append([-100]*(max_target_length - len(item['labels'])) + item['labels'])
++            prefix_left_padded.append([tokenizer.pad_token_id]*(max_prefix_length - len(item['prefix'])) + item['prefix'])
++            prefix_attention_mask_left_padded.append([0]*(max_prefix_length - len(item['prefix_attention_mask'])) + item['prefix_attention_mask'])
++        forward_kwargs = {
++            'input_ids': torch.LongTensor(input_ids),
++            'attention_mask': torch.BoolTensor(attention_mask),
++            'labels': torch.LongTensor(labels)
++        }
++        generate_prefix_kwargs = {
++            'input_ids': torch.LongTensor(prefix_left_padded),
++            'attention_mask': torch.BoolTensor(prefix_attention_mask_left_padded),
++            'labels': torch.LongTensor(labels_left_padded)
++        }
++        return {
++            'forward_kwargs': forward_kwargs,
++            'generate_prefix_kwargs': generate_prefix_kwargs,
++        }
++
++    train_dataloader = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=args['batch_size'], num_workers=args['num_workers'], pin_memory=True,
++                        collate_fn=partial(collate_fn, args=args, tokenizer=tokenizer))
++
++    test_dataloader = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=args['eval_batch_size'], num_workers=args['num_workers'], pin_memory=True,
++                        collate_fn=partial(collate_fn, args=args, tokenizer=tokenizer))
++
++    return (tokenized_dataset['train'], train_dataloader), (tokenized_dataset['test'], test_dataloader)
++
++
++def prepare_datasets_and_data_loaders_idefics2(args, processor):
++    data_collator = MyDataCollator(processor)
++
++    train_dataset = ClverMathDataset(args['train_file'], 'train')
++    train_dataloader = DataLoader(
++        train_dataset,
++        batch_size=args['batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=True,
++    )
++
++    val_dataset = ClverMathDataset(args['train_file'], 'validation')
++    val_dataloader = DataLoader(
++        val_dataset,
++        batch_size=args['eval_batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=False,
++    )
++
++    test_dataset = ClverMathDataset(args['train_file'], 'test')
++    test_dataloader = DataLoader(
++        test_dataset,
++        batch_size=args['eval_batch_size'],
++        collate_fn=data_collator,
++        num_workers=args['num_workers'],
++        pin_memory=True,
++        shuffle=False,
++    )
++
++    if accelerator.is_main_process and args['wandb_log']:
++        wandb.config.update({
++            "train_dataset_size": len(train_dataset),
++            "val_dataset_size": len(val_dataset),
++            "test_dataset_size": len(test_dataset),
++        })
++
++    return (train_dataset, train_dataloader), (val_dataset, val_dataloader), (test_dataset, test_dataloader)
++
++
++def do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths=None):
++    os.makedirs(save_path, exist_ok=True)
++    unwrapped_model = accelerator.unwrap_model(model)
++    unwrapped_model.save_pretrained(save_path, is_main_process=accelerator.is_main_process, save_function=accelerator.save, state_dict=accelerator.get_state_dict(model))
++    tokenizer.save_pretrained(save_path)
++    if accelerator.is_main_process and most_recent_ckpts_paths is not None:
++        most_recent_ckpts_paths.append(save_path)
++        if args['keep_num_ckpt'] is not None and len(most_recent_ckpts_paths) > args['keep_num_ckpt']:
++            ckpt_to_be_removed = most_recent_ckpts_paths.pop(0)
++            # os.remove(ckpt_to_be_removed)
++            shutil.rmtree(ckpt_to_be_removed)
++
++def train_one_epoch(args, model, train_dataset, train_dataloader, optimizer, scheduler, tokenizer,
++                    processor, global_step, val_dataset, val_dataloader, test_dataset, test_dataloader,
++                    prefix, epoch, best_eval_log_dict, summary_log_dict, most_recent_ckpts_paths):
++    model_dir = args['model_dir']
++    clip_grad_norm = args.get('clip_grad_norm', None)
++    evaluating_step_freq = args.get('evaluating_step_freq', None)
++    logging_step_freq = args.get('logging_step_freq', None)
++    saving_step_freq = args.get('saving_step_freq', None)
++    model.train()
++    epoch_result_dict = defaultdict(list)
++
++    with tqdm(enumerate(train_dataloader), total=len(train_dataloader), disable=not accelerator.is_main_process, desc='Train Loop') as t:
++        for idx, batch in t:
++
++            with accelerator.accumulate(model):
++                output = model(**batch)
++                # Get some metrics
++                loss = output[0]
++                result_dict, extra = {}, None
++                # Update
++                accelerator.backward(loss)
++                if accelerator.sync_gradients:
++                    if clip_grad_norm is not None:
++                        accelerator.clip_grad_norm_(model.parameters(), clip_grad_norm)
++                optimizer.step()
++                optimizer.zero_grad()
++                # model.zero_grad()
++                if accelerator.sync_gradients:
++                    scheduler.step()
++
++            if accelerator.sync_gradients:
++                global_step += 1
++                # Step update metric
++                epoch_result_dict['loss'].append(loss.item())
++                for k, v in result_dict.items():
++                    epoch_result_dict[k].append(v)
++
++                # Step evaluating
++                eval_log_dict = {}
++                test_log_dict = {}
++                is_best = False
++                if evaluating_step_freq is not None and global_step % evaluating_step_freq == 0:
++                    accelerator.print(f"Step {global_step} Evaluating...")
++                    evaluate_result_dict = {f'Eval.Gen.{k}':  v for k, v in evaluate_generation(args, model, val_dataset, val_dataloader, processor, tokenizer).items()}
++                    eval_log_dict.update(evaluate_result_dict)
++                    if eval_log_dict['Eval.Gen.value_accuracy'] > best_eval_log_dict.get('Eval.Gen.value_accuracy_best', 0):
++                        is_best = True
++                        best_eval_log_dict['Eval.Gen.value_accuracy_best'] = eval_log_dict['Eval.Gen.value_accuracy']
++                    if 'Eval.Gen.value_accuracy' not in summary_log_dict:
++                        summary_log_dict['Eval.Gen.value_accuracy'] = []
++                    summary_log_dict['Eval.Gen.value_accuracy'].append(eval_log_dict['Eval.Gen.value_accuracy'])
++
++                    test_result_dict = {f'Test.Gen.{k}':  v for k, v in evaluate_generation(args, model, test_dataset, test_dataloader, processor, tokenizer).items()}
++                    test_log_dict.update(test_result_dict)
++                    if 'Test.Gen.value_accuracy' not in summary_log_dict:
++                        summary_log_dict['Test.Gen.value_accuracy'] = []
++                    summary_log_dict['Test.Gen.value_accuracy'].append(test_log_dict['Test.Gen.value_accuracy'])
++
++                # Step logging
++                train_log_dict = {}
++                if logging_step_freq is not None and global_step % logging_step_freq == 0:
++                    train_log_dict = {f'T.{k}': sum(v)/len(v) if isinstance(v, list) else v for k, v in epoch_result_dict.items()}
++
++                if eval_log_dict or train_log_dict:
++                    log_dict = {'lr': scheduler.get_last_lr()[0], **train_log_dict, **eval_log_dict, **best_eval_log_dict, **test_log_dict}
++                    if accelerator.is_main_process and args['wandb_log']:
++                        wandb.log(log_dict, step=global_step)
++                        log_dict = {'wandb': args['wandb_project'] + '|' + args['wandb_run_name'], **log_dict}
++                    log_dict = {k: f'{v:.5g}' if isinstance(v, float) else v for k,v in log_dict.items()}
++                    accelerator.print(f"{prefix}[E={epoch}/{args['n_epochs']}, S={global_step}] {log_dict}")
++
++                # Step saving
++                if saving_step_freq is not None and global_step % saving_step_freq == 0:
++                    accelerator.print(f"Step {global_step} Saving...")
++                    if is_best:
++                        save_path = os.path.join(model_dir, f'best')
++                        do_checkpoint(args, model, tokenizer, save_path)
++                    if args['keep_num_ckpt'] > 0:
++                        save_path = os.path.join(model_dir, f'global_step_{str(global_step)}')
++                        do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths)
++
++                # Keep only max_record items
++                for k, v in epoch_result_dict.items():
++                    if len(v) > 1:
++                        epoch_result_dict[k] = v[-1:]
++
++
++    # Metric summary:
++    epoch_result_dict = {k:(sum(v)/len(v) if isinstance(v, list) else v) for k, v in epoch_result_dict.items()}
++    return epoch_result_dict, global_step
++
++def evaluate_generation(args, model, dataset, dataloader, processor, tokenizer):
++    model.eval()
++    predictions = []
++    targets = []
++    templates = []
++    for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader), disable=not accelerator.is_main_process, desc='Evaluation Gen Loop'):
++        batch_templates = batch['templates']
++        # remove 'templates' from batch
++        batch.pop('templates')
++        output_ = model.module.generate(
++                        **batch,
++                        # max_length=args['max_input_length'],
++                        # output_scores=True,
++                        return_dict_in_generate=True,
++                        num_beams=1,
++                        use_cache=True,
++                        do_sample=False,
++                        pad_token_id=tokenizer.pad_token_id,
++                        eos_token_id=tokenizer.eos_token_id,
++                        max_new_tokens=16,
++                    )
++
++        generated_ids = output_.sequences
++        generated_ids = pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        labels = batch['labels']
++        # labels = pad_across_processes(labels, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        # labels[labels==-100]=tokenizer.pad_token_id
++
++        generated_ids, labels = accelerator.gather(generated_ids), accelerator.gather(labels)
++
++        generated_texts = processor.batch_decode(generated_ids, skip_special_tokens=True)
++        pred_ans = [x.split("Assistant: ")[1][:-1].strip() for x in generated_texts]    # -1 removes "."
++        # pred_ans = pred_ans.strip()
++
++        # generated_ids = output_.sequences
++        # generated_ids = pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++
++        # labels = batch['generate_prefix_kwargs']['labels']
++        # labels = pad_across_processes(labels, dim=1, pad_index=tokenizer.pad_token_id, pad_first=True)
++        # labels[labels==-100]=tokenizer.pad_token_id
++
++        # generated_ids, labels = accelerator.gather(generated_ids), accelerator.gather(labels)
++
++        # preds = [tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip() for g in generated_ids]
++        predictions.extend(pred_ans)
++        # target = [tokenizer.decode(t, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip() for t in labels]
++        targets.extend(labels)
++        templates.extend(batch_templates)
++
++    predictions = predictions[:len(dataset)]
++    targets = targets[:len(dataset)]
++    templates = templates[:len(dataset)]
++
++    if accelerator.is_main_process and accelerator.is_local_main_process:
++        results = []
++        corr = 0
++        total = 0
++        temp_based_acc = {}
++        for pred, tar, temp in zip(predictions, targets, templates):
++            tar = str(tar.detach().cpu().numpy())
++            cur_res = {
++                'pred': pred,
++                'target': tar,
++            }
++            results.append(cur_res)
++
++            temp = str(temp.detach().cpu().numpy())
++            if temp not in temp_based_acc:
++                temp_based_acc[temp] = {}
++                temp_based_acc[temp]['corr'] = 0
++                temp_based_acc[temp]['total'] = 0
++
++            if pred == tar:
++                corr += 1
++                temp_based_acc[temp]['corr'] += 1
++            total += 1
++            temp_based_acc[temp]['total'] += 1
++
++        # save first before execute to trace error.
++        res_path = args['model_dir'].rstrip('/')+ '/' + '_res.json'
++        accelerator.print(f"Saving results to {res_path}")
++        with open(res_path, 'w') as f:
++            json.dump(results, f, indent=2)
++
++        # if args['wandb_log']:
++        #     table = wandb.Table(dataframe=pd.DataFrame(results))
++        #     wandb.log({"predictions": table})
++
++        value_accuracy = corr / len(results) * 100
++        accelerator.print(f"[Eval Info] value_accuracy: {value_accuracy:.5g}%")
++        value_accuracy = torch.FloatTensor([value_accuracy]).to(accelerator.device)
++
++        templates_value_accuracy = {}
++        for temp, acc in temp_based_acc.items():
++            acc = acc['corr'] / acc['total'] * 100
++            temp_name = ID_TO_TEMPLATE[int(temp)]
++            accelerator.print(f"[Eval Info] value_accuracy on {temp_name} category: {acc:.5g}%")
++            templates_value_accuracy[temp_name] = torch.FloatTensor([acc]).to(accelerator.device)
++    else:
++        value_accuracy = torch.FloatTensor([-1.0]).to(accelerator.device)
++        templates_value_accuracy = {k: torch.FloatTensor([-1.0]).to(accelerator.device) for k in ID_TO_TEMPLATE.values()}
++
++    value_accuracy = broadcast(value_accuracy).cpu().numpy().tolist()[0]
++    for temp_category, acc in templates_value_accuracy.items():
++        templates_value_accuracy[temp_category] = broadcast(acc).cpu().numpy().tolist()[0]
++
++    # Metric summary:
++    out_stats = {'value_accuracy': value_accuracy}
++    for temp_category, acc in templates_value_accuracy.items():
++        out_stats[temp_category] = acc
++
++    model.train()
++    return out_stats
++
++def main(args):
++    set_seed(args['seed'] + accelerator.process_index)
++    if torch.distributed.get_rank() == 0 and args['wandb_log']:
++        wandb.init(project=args['wandb_project'], name=args['wandb_run_name'])
++        wandb.config.update(args)
++
++    model, tokenizer, processor = create_idefics_model(args)
++    (train_dataset, train_dataloader), (val_dataset, val_dataloader), (test_dataset, test_dataloader) = prepare_datasets_and_data_loaders_idefics2(args, processor)
++    accelerator.print(f'[Vocab size]: {len(tokenizer)}')
++
++    if accelerator.is_main_process and args['wandb_log']:
++        wandb.run.summary.update({
++            'pad_token_id': tokenizer.pad_token_id,
++            'eos_token_id': tokenizer.eos_token_id,
++            'unk_token_id': tokenizer.unk_token_id,
++            'vocab_size': len(tokenizer)
++        })
++
++    n_epochs = args['n_epochs']
++    num_training_steps = (len(train_dataloader) // accelerator.num_processes * n_epochs) // args['gradient_accumulation_steps']
++    warmup_step = args['warmup_step'] if args['warmup_step'] is not None and args['warmup_step'] >= 0 else int(0.1 * num_training_steps)
++    # optimizer_grouped_parameters = [
++    #     {
++    #         "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "LayerNorm.weight"])],
++    #         "weight_decay": args['weight_decay'],
++    #     },
++    #     {
++    #         "params": [p for n, p in model.named_parameters() if any(nd in n for nd in ["bias", "LayerNorm.weight"])],
++    #         "weight_decay": 0.0,
++    #     },
++    # ]
++    optimizer = AdamW(model.parameters(), lr=args['learning_rate'], eps=1e-8)
++    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=num_training_steps)
++    # scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step)
++    accelerator.print(
++        f"***** Running training *****\n"
++        f"  Num examples = {len(train_dataset)}\n"
++        f"  Num Epochs = {n_epochs}\n"
++        f"  Instantaneous batch size per device = {args['batch_size']}\n"
++        f"  Total train batch size (w. parallel, distributed & accumulation) = {args['batch_size']*accelerator.num_processes*args['gradient_accumulation_steps']}\n"
++        f"  Total optimization steps = {num_training_steps}\n"
++        f"  Warm up step: {warmup_step}\n"
++        f"  Learning rate: {args['learning_rate']}\n"
++    )
++    model, optimizer, train_dataloader, val_dataloader, test_dataloader = accelerator.prepare(model, optimizer, train_dataloader, val_dataloader, test_dataloader)
++
++    global_step = 0
++    evaluating_epoch_freq = args['evaluating_epoch_freq']
++    logging_epoch_freq = args['logging_epoch_freq']
++    saving_epoch_freq = args['saving_epoch_freq']
++    model_dir=args['model_dir']
++    best_eval_log_dict = {}
++    summary_log_dict = {}
++    os.makedirs(model_dir, exist_ok=True)
++    most_recent_ckpts_paths = []
++    with tqdm(range(1, n_epochs+1), total=n_epochs, disable=False) as t:
++        for epoch in t:
++            kwargs = {
++                'args': args,
++                'model': model,
++                'train_dataset': train_dataset,
++                'train_dataloader': train_dataloader,
++                'val_dataset': val_dataset,
++                'val_dataloader': val_dataloader,
++                'test_dataset': test_dataset,
++                'test_dataloader': test_dataloader,
++                'optimizer': optimizer,
++                'scheduler': scheduler,
++                'global_step': global_step,
++                'processor': processor,
++                'tokenizer': tokenizer,
++                'prefix':'',
++                'epoch': epoch,
++                'best_eval_log_dict': best_eval_log_dict,
++                'summary_log_dict': summary_log_dict,
++                'most_recent_ckpts_paths': most_recent_ckpts_paths,
++            }
++            train_epoch_result_dict, global_step = train_one_epoch(**kwargs)
++
++            eval_log_dict = {}
++            test_log_dict = {}
++            is_best = False
++            if evaluating_epoch_freq is not None and epoch % evaluating_epoch_freq == 0:
++                evaluate_result_dict = {f'Eval.Gen.{k}':  v for k, v in evaluate_generation(args, model, val_dataset, val_dataloader, processor, tokenizer).items()}
++                eval_log_dict.update(evaluate_result_dict)
++                if eval_log_dict['Eval.Gen.value_accuracy'] > best_eval_log_dict.get('Eval.Gen.value_accuracy_best', 0):
++                    is_best = True
++                    best_eval_log_dict['Eval.Gen.value_accuracy_best'] = eval_log_dict['Eval.Gen.value_accuracy']
++                if 'Eval.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Eval.Gen.value_accuracy'] = []
++                summary_log_dict['Eval.Gen.value_accuracy'].append(eval_log_dict['Eval.Gen.value_accuracy'])
++
++                test_result_dict = {f'Test.Gen.{k}':  v for k, v in evaluate_generation(args, model, test_dataset, test_dataloader, processor, tokenizer).items()}
++                test_log_dict.update(test_result_dict)
++                if 'Test.Gen.value_accuracy' not in summary_log_dict:
++                    summary_log_dict['Test.Gen.value_accuracy'] = []
++                summary_log_dict['Test.Gen.value_accuracy'].append(test_log_dict['Test.Gen.value_accuracy'])
++
++            train_log_dict = {}
++            if logging_epoch_freq is not None and epoch % logging_epoch_freq == 0:
++                train_log_dict = {f'T.{k}': sum(v)/len(v) if isinstance(v, list) else v for k, v in train_epoch_result_dict.items()}
++
++            if eval_log_dict or train_log_dict:
++                log_dict = {'lr': scheduler.get_last_lr()[0], **train_log_dict, **eval_log_dict, **best_eval_log_dict, **test_log_dict}
++                if accelerator.is_main_process and args['wandb_log']:
++                    wandb.log(log_dict, step=global_step)
++                    log_dict = {'wandb': args['wandb_project'] + '|' + args['wandb_run_name'], **log_dict}
++                log_dict = {k: f'{v:.5g}' if isinstance(v, float) else v for k,v in log_dict.items()}
++                accelerator.print(f"[E={epoch}/{args['n_epochs']}, S={global_step}] {log_dict}")
++
++            if saving_epoch_freq is not None and epoch % saving_epoch_freq == 0:
++                if is_best:
++                    save_path = os.path.join(model_dir, f'best')
++                    do_checkpoint(args, model, tokenizer, save_path)
++                if args['keep_num_ckpt'] > 0:
++                    save_path=os.path.join(args['model_dir'], f'global_step_{str(global_step)}_epoch_{epoch}')
++                    do_checkpoint(args, model, tokenizer, save_path, most_recent_ckpts_paths)
++
++    return
++
++
++if __name__ == '__main__':
++    from transformers import HfArgumentParser
++    NONE_INT = -100
++    NONE_STR = 'None'
++    @dataclass
++    class Arguments:
++        model_name_or_path: str
++        tokenizer_name_or_path: str
++        model_dir: str
++        train_file: str
++        test_file: str
++        batch_size: int = field(default=4)
++        eval_batch_size: int = field(default=8)
++        n_epochs: int = field(default=40)
++        num_workers: int = field(default=8)
++        learning_rate: float = field(default=2e-5)
++        weight_decay: float = field(default=1e-6)
++        warmup_step: int = field(default=0)
++        clip_grad_norm: float = field(default=1)
++        evaluating_epoch_freq: int = field(default=1)
++        logging_epoch_freq: int = field(default=1)
++        saving_epoch_freq: int = field(default=1000)
++        evaluating_step_freq: int = field(default=NONE_INT)
++        logging_step_freq: int = field(default=NONE_INT)
++        saving_step_freq: int = field(default=NONE_INT)
++        seed: int = field(default=42)
++        max_input_length: int = field(default=700)
++        gradient_accumulation_steps: int = field(default=1)
++        keep_num_ckpt: int = field(default=1)
++        # wandb stuff
++        wandb_log: bool = field(default=False)
++        wandb_project: str = field(default='tmp_anvfupsadfn')
++        wandb_run_name: str = field(default='default_run_name')
++        ###
++        engine: str = field(default='python')
++        # lora
++        use_lora: bool = field(default=False)
++        use_qlora: bool = field(default=False)
++
++    parser = HfArgumentParser(Arguments)
++    (args,) = parser.parse_args_into_dataclasses()
++    args = asdict(args)
++    for k,v in args.items():
++        if v in [NONE_INT, NONE_STR]:
++            args[k] = None
++    accelerator = Accelerator(gradient_accumulation_steps=args['gradient_accumulation_steps'], kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=18000))]) # wait for processing upto 5hrs
++    accelerator.print(args)
++    accelerator.print(json.dumps(args, indent=2, ensure_ascii=False))
++    main(args)
